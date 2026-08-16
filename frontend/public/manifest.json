@@ -1,0 +1,16 @@
+{
+  "name": "CarInspect AI - Car Pre-Purchase Inspection",
+  "short_name": "CarInspectAI",
+  "description": "AI-Powered Pre-Purchase Vehicle Diagnostics & 20-Point Inspection Wizard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
