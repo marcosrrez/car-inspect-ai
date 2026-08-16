@@ -2,6 +2,7 @@ import io
 import os
 import json
 import base64
+import httpx
 import numpy as np
 from PIL import Image, ImageStat, ImageFilter
 from typing import Dict, Any, List, Optional
@@ -457,9 +458,19 @@ CHECKLIST_RUBRICS: Dict[str, Dict[str, Any]] = {
 
 class VisionLanguageModelService:
     def __init__(self):
-        self.openai_key = os.environ.get("OPENAI_API_KEY")
+        # Auto-load from environment or local api_keys
         self.anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+        self.openai_key = os.environ.get("OPENAI_API_KEY")
         self.gemini_key = os.environ.get("GEMINI_API_KEY")
+
+        if not self.anthropic_key and os.path.exists("/Users/florecer/.api_keys"):
+            try:
+                with open("/Users/florecer/.api_keys", "r") as f:
+                    for line in f:
+                        if line.startswith("ANTHROPIC_API_KEY="):
+                            self.anthropic_key = line.strip().split("=", 1)[1]
+            except Exception:
+                pass
 
     def _assess_image_quality(self, img: Image.Image) -> Dict[str, Any]:
         img_gray = img.convert('L')
@@ -483,33 +494,92 @@ class VisionLanguageModelService:
             "is_obscured": is_blurry or is_too_dark or is_too_bright
         }
 
-    def _detect_visual_features(self, img: Image.Image, component_key: str) -> List[str]:
-        img_rgb = img.convert('RGB')
-        stat = ImageStat.Stat(img_rgb)
-        r, g, b = stat.mean[0], stat.mean[1], stat.mean[2]
-        features = []
+    def _call_anthropic_vision(
+        self,
+        image_bytes: bytes,
+        component_name: str,
+        options: Dict[str, Any],
+        car_context: str
+    ) -> Optional[VisualInspectionResult]:
+        """Queries Claude 3.5 Sonnet Vision with strict structured JSON prompt."""
+        if not self.anthropic_key:
+            return None
         
-        # Caramel / milky emulsion detection (High R, moderate-high G, moderate B, with warm caramel tone)
-        if r > 160 and g > 130 and b > 80 and (r - b) > 40:
-            features.append("Caramel / milky foam discoloration")
+        try:
+            b64_img = base64.b64encode(image_bytes).decode('utf-8')
+            categories_list = list(options.keys()) + ["Error"]
             
-        # Dark grime / heavy wet oil saturation (Low overall RGB < 60)
-        if max(r, g, b) < 65:
-            features.append("Dark viscous fluid / grime coating")
-            
-        # Turquoise / white acid crust (High G and B, moderate R)
-        if (g > 100 or b > 100) and abs(g - b) < 30 and g > r + 15:
-            features.append("Turquoise / white battery acid sulfate crust")
-            
-        # Golden amber oil (High R, moderate G, low B < 70)
-        if r > 140 and g > 100 and b < 70 and (r - b) > 70:
-            features.append("Golden amber fluid film")
-            
-        # Metallic sheen
-        if abs(r - g) < 20 and abs(g - b) < 20 and 70 < r < 180:
-            features.append("Uniform clean aluminum metal surface")
+            prompt = f"""You are an expert master automotive diagnostician evaluating a {car_context}.
+Inspect this photo of the vehicle's {component_name}.
+You must categorize the visible condition into one of these exact categories: {json.dumps(categories_list)}.
 
-        return features
+Rubric Options:
+{json.dumps({k: {"points": v["points"], "is_walk": v["is_walk"]} for k, v in options.items()}, indent=2)}
+
+Important: If the photo is too blurry, too dark, occluded, or does NOT show the {component_name}, set "finding_category": "Error".
+
+Return ONLY valid JSON matching this exact structure:
+{{
+  "component_analyzed": "{component_name}",
+  "finding_category": "<exact category or 'Error'>",
+  "points": <integer points based on rubric>,
+  "is_walk_condition": <true/false>,
+  "explanation": "<1-2 sentence mechanical breakdown of visible evidence>",
+  "negotiation_tip": "<what buyer should say to dealer if points < 0, or null>"
+}}"""
+
+            headers = {
+                "x-api-key": self.anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+
+            payload = {
+                "model": "claude-3-5-sonnet-20241022",
+                "max_tokens": 1000,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": b64_img
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            }
+
+            with httpx.Client(timeout=25.0) as client:
+                res = client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+                if res.status_code == 200:
+                    resp_json = res.json()
+                    text_content = resp_json["content"][0]["text"]
+                    # Extract JSON block
+                    start = text_content.find('{')
+                    end = text_content.rfind('}') + 1
+                    if start != -1 and end != 0:
+                        parsed = json.loads(text_content[start:end])
+                        return VisualInspectionResult(
+                            component_analyzed=parsed.get("component_analyzed", component_name),
+                            finding_category=parsed.get("finding_category", "Error"),
+                            points=int(parsed.get("points", 0)),
+                            is_walk_condition=bool(parsed.get("is_walk_condition", False)),
+                            explanation=parsed.get("explanation", ""),
+                            negotiation_tip=parsed.get("negotiation_tip", None),
+                            confidence=0.96
+                        )
+        except Exception as e:
+            print(f"Anthropic Vision API call error (fallback to local engine): {e}")
+        return None
 
     def diagnose_image(
         self,
@@ -532,6 +602,27 @@ class VisionLanguageModelService:
         comp_name = rubric_data["component"]
         options = rubric_data["options"]
 
+        # 1. Check if preset condition is requested (for 1-click test evaluations)
+        if preset_condition and preset_condition in options:
+            opt = options[preset_condition]
+            return VisualInspectionResult(
+                component_analyzed=comp_name,
+                finding_category=preset_condition,
+                points=opt["points"],
+                is_walk_condition=opt["is_walk"],
+                explanation=opt["explanation"],
+                negotiation_tip=opt["negotiation_tip"],
+                confidence=0.98,
+                suggested_action="Score recorded."
+            )
+
+        # 2. Try Live Multimodal Vision LLM (Claude 3.5 Sonnet) if API Key is available
+        if self.anthropic_key and not preset_condition:
+            llm_result = self._call_anthropic_vision(image_bytes, comp_name, options, car_context)
+            if llm_result:
+                return llm_result
+
+        # 3. Embedded Automotive Computer-Vision & Quality Engine Fallback
         try:
             pil_img = Image.open(io.BytesIO(image_bytes))
             quality = self._assess_image_quality(pil_img)
@@ -546,7 +637,7 @@ class VisionLanguageModelService:
                 negotiation_tip=None
             )
 
-        # "I Can't See That" / Obscured / Blurry / Dark photo fallback
+        # "I Can't See That" / Obscured / Blurry photo fallback
         if quality["is_obscured"] and not preset_condition:
             reason = "too blurry" if quality["is_blurry"] else ("too dark" if quality["is_too_dark"] else "overexposed")
             return VisualInspectionResult(
@@ -560,12 +651,8 @@ class VisionLanguageModelService:
                 suggested_action=f"Hold the camera steady 8-12 inches from the {comp_name} with good lighting."
             )
 
-        if preset_condition and preset_condition in options:
-            selected_cat = preset_condition
-            opt = options[selected_cat]
-        else:
-            selected_cat = self._match_condition_from_image(component_key, features, quality, options)
-            opt = options[selected_cat]
+        selected_cat = self._match_condition_from_image(component_key, features, quality, options)
+        opt = options[selected_cat]
 
         return VisualInspectionResult(
             component_analyzed=comp_name,
@@ -576,35 +663,45 @@ class VisionLanguageModelService:
             negotiation_tip=opt["negotiation_tip"],
             confidence=0.94 if not opt["is_walk"] else 0.98,
             detected_features=features,
-            suggested_action="Score recorded in checklist." if not opt["is_walk"] else "CRITICAL: Deal-breaker detected. Inspect alternatives."
+            suggested_action="Score recorded in checklist." if not opt["is_walk"] else "CRITICAL: Deal-breaker detected."
         )
+
+    def _detect_visual_features(self, img: Image.Image, component_key: str) -> List[str]:
+        img_rgb = img.convert('RGB')
+        stat = ImageStat.Stat(img_rgb)
+        r, g, b = stat.mean[0], stat.mean[1], stat.mean[2]
+        features = []
+        
+        if r > 160 and g > 130 and b > 80 and (r - b) > 40:
+            features.append("Caramel / milky foam discoloration")
+        if max(r, g, b) < 65:
+            features.append("Dark viscous fluid / grime coating")
+        if (g > 100 or b > 100) and abs(g - b) < 30 and g > r + 15:
+            features.append("Turquoise / white battery acid sulfate crust")
+        if r > 140 and g > 100 and b < 70 and (r - b) > 70:
+            features.append("Golden amber fluid film")
+        if abs(r - g) < 20 and abs(g - b) < 20 and 70 < r < 180:
+            features.append("Uniform clean aluminum metal surface")
+
+        return features
 
     def _match_condition_from_image(self, component_key: str, features: List[str], quality: Dict[str, Any], options: Dict[str, Any]) -> str:
         opt_keys = list(options.keys())
-        
-        # 1. Milkshake emulsion
         if any("milky" in f.lower() or "caramel" in f.lower() for f in features):
             for k in opt_keys:
                 if options[k]["is_walk"] or "milkshake" in k.lower():
                     return k
-
-        # 2. Corroded battery
         if any("acid" in f.lower() or "corros" in f.lower() for f in features):
             for k in opt_keys:
                 if "corrod" in k.lower() or "acid" in k.lower():
                     return k
-
-        # 3. Dark grime / leaks
         if any("dark viscous" in f.lower() or "grime" in f.lower() for f in features):
             for k in opt_keys:
                 if "wet" in k.lower() or "grimy" in k.lower() or "dark" in k.lower() or "dripping" in k.lower() or "torn" in k.lower():
                     return k
-
-        # 4. Clean / bone dry
         for k in opt_keys:
             if "clean" in k.lower() or "bone dry" in k.lower() or "bright" in k.lower() or "intact" in k.lower() or "uniform" in k.lower():
                 return k
-
         return opt_keys[0]
 
 vision_service = VisionLanguageModelService()
