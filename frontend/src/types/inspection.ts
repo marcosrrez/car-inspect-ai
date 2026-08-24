@@ -45,6 +45,14 @@ export interface VisualInspectionResult {
   suggested_action?: string | null;
 }
 
+export interface RubricOption {
+  label: string;
+  points: number;
+  is_walk?: boolean;
+  explanation?: string;
+  negotiation_tip?: string | null;
+}
+
 export interface ChecklistItem {
   id: string;
   station_id: string;
@@ -52,7 +60,7 @@ export interface ChecklistItem {
   subtitle: string;
   media_type: "image" | "audio";
   instruction: string;
-  rubric_summary: { label: string; points: number; is_walk?: boolean }[];
+  rubric_summary: RubricOption[];
   status: ItemStatus;
   finding_category?: string;
   points: number;

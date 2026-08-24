@@ -29,7 +29,6 @@ export async function compressImage(
         let width = img.width;
         let height = img.height;
 
-        // Calculate aspect-ratio preserving dimensions
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -52,7 +51,6 @@ export async function compressImage(
           return;
         }
 
-        // Draw with high quality interpolation
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, width, height);
@@ -88,6 +86,15 @@ export async function compressImage(
       img.src = event.target?.result as string;
     };
     reader.onerror = () => reject(new Error("Failed to read file as data URL."));
+    reader.readAsDataURL(fileOrBlob);
+  });
+}
+
+export async function fileToDataUrl(fileOrBlob: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read file as data URL"));
     reader.readAsDataURL(fileOrBlob);
   });
 }

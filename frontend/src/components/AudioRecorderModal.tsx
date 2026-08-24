@@ -1,402 +1,241 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   Mic,
   Square,
-  Volume2,
   X,
-  Sparkles,
-  Loader2,
-  AlertTriangle,
-  Activity,
-  Play,
-  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
-import { ChecklistItem } from "../types/inspection";
-import { diagnoseAudio, fetchSampleAudioBlob } from "../utils/apiClient";
 import { useInspectionStore } from "../store/useInspectionStore";
+import { diagnoseAudio, fetchSampleAudioBlob } from "../utils/apiClient";
 
-interface AudioRecorderModalProps {
-  item: ChecklistItem | null;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
-  item,
-  isOpen,
-  onClose,
-}) => {
-  const { recordAudioResult } = useInspectionStore();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export const AudioRecorderModal: React.FC = () => {
+  const {
+    audioModalOpen,
+    activeCaptureItemId,
+    closeAudioModal,
+    updateItemResult,
+    openWalkAwayModal,
+    getAllItems,
+  } = useInspectionStore();
 
   const [isRecording, setIsRecording] = useState(false);
-  const [recordDuration, setRecordDuration] = useState(0);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [contextHint, setContextHint] = useState<"idling" | "revving">("idling");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animFrameIdRef = useRef<number | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (item) {
-      setContextHint(item.id.includes("rev") ? "revving" : "idling");
-    }
-  }, [item]);
+  if (!audioModalOpen || !activeCaptureItemId) return null;
 
-  useEffect(() => {
-    if (!isOpen) {
-      stopRecording();
-      cleanUpMedia();
-      setAudioBlob(null);
-      setAudioUrl(null);
-      setErrorMsg(null);
-      setLoading(false);
-    }
-  }, [isOpen]);
-
-  const cleanUpMedia = () => {
-    if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  };
+  const item = getAllItems().find((it) => it.id === activeCaptureItemId);
+  if (!item) return null;
 
   const startRecording = async () => {
     try {
       setErrorMsg(null);
-      setAudioBlob(null);
-      setAudioUrl(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      streamRef.current = stream;
-
-      // Audio Context for Live Waveform Visualizer
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      audioContextRef.current = audioCtx;
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyserRef.current = analyser;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      // Start Visualizer Loop
-      drawWaveform();
-
-      // MediaRecorder Setup
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      const chunks: BlobPart[] = [];
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
-        setAudioBlob(blob);
-        setAudioUrl(url);
-        cleanUpMedia();
-        await processAudio(blob);
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/wav",
+        });
+        stream.getTracks().forEach((track) => track.stop());
+        await processAudioBlob(audioBlob);
       };
 
-      mediaRecorder.start(200);
+      mediaRecorder.start();
       setIsRecording(true);
-      setRecordDuration(0);
+      setRecordingTime(0);
 
-      // 5-second countdown timer
-      let seconds = 0;
-      timerIntervalRef.current = setInterval(() => {
-        seconds += 1;
-        setRecordDuration(seconds);
-        if (seconds >= 5) {
-          stopRecording();
-        }
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          if (prev >= 5) {
+            stopRecording();
+            return 5;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(err.message || "Microphone access denied or unavailable.");
-      setIsRecording(false);
+      console.error(err);
+      setErrorMsg("Microphone access denied. Please allow microphone permissions or test a sample below.");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    setIsRecording(false);
   };
 
-  const drawWaveform = () => {
-    const canvas = canvasRef.current;
-    const analyser = analyserRef.current;
-    if (!canvas || !analyser) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const render = () => {
-      animFrameIdRef.current = requestAnimationFrame(render);
-      analyser.getByteTimeDomainData(dataArray);
-
-      ctx.fillStyle = "rgb(15, 23, 42)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = "#f97316";
-      ctx.beginPath();
-
-      const sliceWidth = (canvas.width * 1.0) / bufferLength;
-      let x = 0;
-
-      for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const y = (v * canvas.height) / 2;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-
-        x += sliceWidth;
-      }
-
-      ctx.lineTo(canvas.width, canvas.height / 2);
-      ctx.stroke();
-    };
-
-    render();
-  };
-
-  const processAudio = async (blob: Blob, presetFault?: string) => {
-    if (!item) return;
+  const processAudioBlob = async (blob: Blob, presetFault?: string) => {
     setLoading(true);
     setErrorMsg(null);
-
     try {
-      const result = await diagnoseAudio(blob, contextHint, presetFault);
-      recordAudioResult(item.id, result);
-      onClose();
+      const diagResult = await diagnoseAudio(blob, "idling", presetFault);
+
+      updateItemResult(item.id, {
+        finding_category: diagResult.primary_condition,
+        points: diagResult.points,
+        is_walk_condition: diagResult.is_walk_condition,
+        explanation: diagResult.explanation,
+        negotiation_tip: diagResult.negotiation_tip,
+        confidence: diagResult.confidence,
+        audio_result: diagResult,
+      });
+
+      closeAudioModal();
+
+      if (diagResult.is_walk_condition) {
+        openWalkAwayModal(
+          `${item.title} — ${diagResult.primary_condition}`,
+          diagResult.explanation
+        );
+      }
     } catch (err: any) {
-      console.error("Audio diagnosis error:", err);
-      setErrorMsg(`Audio AST inference failed: ${err.message}`);
+      console.error(err);
+      setErrorMsg(err.message || "Acoustic analysis failed. Please retry.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTestPreset = async (presetId: string, faultName: string) => {
-    if (!item) return;
+  const handleTestSample = async (presetId: string, faultName: string) => {
     setLoading(true);
     setErrorMsg(null);
     try {
       const sampleBlob = await fetchSampleAudioBlob(presetId);
-      await processAudio(sampleBlob, faultName);
+      await processAudioBlob(sampleBlob, faultName);
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to fetch sample audio.");
+      console.error(err);
+      setErrorMsg("Failed to analyze sample.");
       setLoading(false);
     }
   };
 
-  if (!isOpen || !item) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-zinc-200/80 animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
           <div>
-            <div className="text-[11px] font-semibold tracking-wider text-orange-400 uppercase flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5" />
-              <span>Audio Spectrogram Transformer (AST)</span>
+            <div className="text-[11px] font-semibold tracking-wider text-orange-600 uppercase">
+              Acoustic Spectrogram Transformer
             </div>
-            <h3 className="text-base font-bold text-white">{item.title}</h3>
+            <h3 className="text-lg font-bold text-zinc-900">{item.title}</h3>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+            onClick={closeAudioModal}
+            className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-400 hover:text-zinc-900 flex items-center justify-center transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
-          {/* Instructions */}
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-2">
-            <div className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <Mic className="w-4 h-4 text-orange-400" />
-              <span>Acoustic Scan Procedure:</span>
-            </div>
-            <p className="text-slate-400 leading-relaxed">{item.instruction}</p>
+        {errorMsg && (
+          <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs">
+            {errorMsg}
+          </div>
+        )}
 
-            {/* Context Selector */}
-            <div className="pt-2 border-t border-slate-850 flex items-center gap-2">
-              <span className="text-slate-400 font-medium">Acoustic Mode:</span>
-              <button
-                onClick={() => setContextHint("idling")}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition ${
-                  contextHint === "idling"
-                    ? "bg-orange-500/20 text-orange-300 border-orange-500/40"
-                    : "bg-slate-900 text-slate-400 border-slate-800"
-                }`}
-              >
-                Idling (750 RPM)
-              </button>
-              <button
-                onClick={() => setContextHint("revving")}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition ${
-                  contextHint === "revving"
-                    ? "bg-orange-500/20 text-orange-300 border-orange-500/40"
-                    : "bg-slate-900 text-slate-400 border-slate-800"
-                }`}
-              >
-                Rev / Decel (2,500 RPM)
-              </button>
-            </div>
+        {/* Live Audio Visualizer / Timer */}
+        <div className="my-6 bg-zinc-900 rounded-2xl p-6 text-white text-center flex flex-col items-center justify-center">
+          <div className="text-xs text-zinc-400 font-medium mb-1">
+            {isRecording ? "Listening to engine acoustics..." : "Ready to record 5-second sample"}
+          </div>
+          <div className="text-3xl font-mono font-bold text-orange-400">
+            00:0{isRecording ? recordingTime : "0"} / 00:05
           </div>
 
-          {/* Waveform Visualizer Canvas */}
-          <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 h-32 flex items-center justify-center">
-            <canvas
-              ref={canvasRef}
-              width={500}
-              height={128}
-              className="w-full h-full object-cover"
-            />
-
-            {!isRecording && !loading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 pointer-events-none">
-                <Volume2 className="w-6 h-6 text-slate-500 mb-1" />
-                <span className="text-xs text-slate-400">Microphone standby</span>
-              </div>
-            )}
-
-            {isRecording && (
-              <div className="absolute top-3 right-3 px-2 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span>REC 0:0{recordDuration} / 0:05</span>
-              </div>
-            )}
-          </div>
-
-          {/* Record / Stop Button */}
-          <div className="flex justify-center">
-            {isRecording ? (
-              <button
-                onClick={stopRecording}
-                className="px-6 py-3 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 transition"
-              >
-                <Square className="w-4 h-4 fill-white" />
-                <span>Stop & Evaluate AST</span>
-              </button>
-            ) : (
-              <button
-                onClick={startRecording}
-                disabled={loading}
-                className="px-6 py-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-orange-500/30 active:scale-95 transition"
-              >
-                <Mic className="w-4 h-4" />
-                <span>Record 5-Second Engine Audio</span>
-              </button>
-            )}
-          </div>
-
-          {/* Loading status */}
-          {loading && (
-            <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center gap-3 text-orange-400 text-xs font-medium animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Transforming audio to Mel-Spectrogram & AST 19-Class inference...</span>
+          {/* Waveform bars */}
+          {isRecording && (
+            <div className="flex items-center gap-1.5 mt-4 h-8">
+              {[40, 75, 95, 60, 85, 50, 90, 70, 45, 80, 60].map((h, i) => (
+                <div
+                  key={i}
+                  className="w-1.5 bg-orange-500 rounded-full animate-pulse"
+                  style={{
+                    height: `${h}%`,
+                    animationDelay: `${i * 0.1}s`,
+                  }}
+                />
+              ))}
             </div>
           )}
+        </div>
 
-          {/* Error Message */}
-          {errorMsg && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
+        {/* Primary Action Button */}
+        <div className="space-y-3">
+          {!isRecording ? (
+            <button
+              disabled={loading}
+              onClick={startRecording}
+              className="w-full h-14 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-semibold text-base shadow-sm transition flex items-center justify-center gap-2.5 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>Processing Spectrogram...</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5" />
+                  <span>Start 5-Second Recording</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-semibold text-base shadow-sm transition flex items-center justify-center gap-2.5"
+            >
+              <Square className="w-5 h-5 fill-current" />
+              <span>Stop & Analyze Now</span>
+            </button>
           )}
+        </div>
 
-          {/* 1-Click Acoustic Test Presets */}
-          <div className="pt-3 border-t border-slate-800">
-            <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>1-Click Audio Test Presets (Instant Fault Simulation):</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* Test / Demo Acoustic Presets */}
+        <div className="mt-6 pt-4 border-t border-zinc-100">
+          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+            Or test with calibrated engine audio:
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[
+              { id: "healthy_idle", name: "Healthy Idle", pts: "+2", walk: false },
+              { id: "rod_knock", name: "Rod Knock", pts: "-10", walk: true },
+              { id: "lifter_tick", name: "Lifter Tick", pts: "-2", walk: false },
+              { id: "belt_squeal", name: "Belt Squeal", pts: "-1", walk: false },
+            ].map((p) => (
               <button
-                disabled={loading}
-                onClick={() => handleTestPreset("healthy_idle", "Healthy Engine Idle")}
-                className="px-3 py-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-left text-xs transition flex items-center justify-between group"
+                key={p.id}
+                disabled={loading || isRecording}
+                onClick={() => handleTestSample(p.id, p.name)}
+                className="px-3 py-2 rounded-xl text-xs font-medium text-left border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 transition flex items-center justify-between"
               >
-                <div>
-                  <div className="text-emerald-400 font-semibold">Healthy Engine Idle</div>
-                  <div className="text-[10px] text-slate-400">Smooth 750 RPM harmonic cycle</div>
-                </div>
-                <span className="font-mono text-[10px] font-bold text-emerald-400">+3 pts</span>
+                <span>{p.name}</span>
+                <span
+                  className={`text-[10px] font-semibold ${
+                    p.walk ? "text-red-600" : "text-zinc-500"
+                  }`}
+                >
+                  {p.walk ? "Walk Away" : p.pts}
+                </span>
               </button>
-
-              <button
-                disabled={loading}
-                onClick={() => handleTestPreset("rod_knock", "Rod Knock")}
-                className="px-3 py-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-left text-xs transition flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-red-400 font-semibold flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    Rod Knock (Fatal)
-                  </div>
-                  <div className="text-[10px] text-slate-400">Heavy double-tap journal knock</div>
-                </div>
-                <span className="font-mono text-[10px] font-bold text-red-400">WALK</span>
-              </button>
-
-              <button
-                disabled={loading}
-                onClick={() => handleTestPreset("lifter_tick", "Lifter / Tappet Tick")}
-                className="px-3 py-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-left text-xs transition flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-amber-400 font-semibold">Valvetrain Lifter Tick</div>
-                  <div className="text-[10px] text-slate-400">Half-speed clicking in head</div>
-                </div>
-                <span className="font-mono text-[10px] font-bold text-amber-400">-2 pts</span>
-              </button>
-
-              <button
-                disabled={loading}
-                onClick={() => handleTestPreset("belt_squeal", "Serpentine Belt Squeal")}
-                className="px-3 py-2 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-left text-xs transition flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-amber-400 font-semibold">Serpentine Belt Squeal</div>
-                  <div className="text-[10px] text-slate-400">2.2 kHz pulley chirp</div>
-                </div>
-                <span className="font-mono text-[10px] font-bold text-amber-400">-2 pts</span>
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       </div>

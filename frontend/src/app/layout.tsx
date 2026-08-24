@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
   subsets: ["latin"],
 });
 
@@ -17,23 +12,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#020617",
+  themeColor: "#f8f9fa",
 };
 
 export const metadata: Metadata = {
-  title: "CarInspect AI — AI Car Pre-Purchase Inspection & Diagnostic PWA",
+  title: "CarInspect AI — Vehicle Pre-Purchase Inspection",
   description:
-    "AI-powered mobile car pre-purchase inspection application combining Audio Spectrogram Transformer (AST) 19-class acoustic fault detection and Multimodal Vision-Language Models (VLM) for 20-point mechanical evaluation.",
-  keywords: [
-    "Car Pre-Purchase Inspection",
-    "Automotive AI Diagnostic",
-    "AST Audio Spectrogram Transformer",
-    "Multimodal VLM Vehicle Inspection",
-    "Rod Knock Detection",
-    "Head Gasket Detection",
-    "Used Car Scorecard",
-  ],
-  authors: [{ name: "CarInspect AI Team" }],
+    "Calm, focused AI-assisted vehicle pre-purchase inspection instrument combining Acoustic AST and Multimodal Vision AI.",
   manifest: "/manifest.json",
 };
 
@@ -43,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} dark`}>
-      <body className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
+    <html lang="en" className={`${inter.variable} light`}>
+      <body className="min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans antialiased selection:bg-orange-500 selection:text-white">
         {children}
       </body>
     </html>

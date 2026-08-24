@@ -6,15 +6,15 @@ import {
   VehicleProfile,
   VisualInspectionResult,
   AudioInspectionResult,
-  OverallReportSummary,
+  RubricOption,
 } from "../types/inspection";
 
 const INITIAL_STATIONS: Station[] = [
   {
     id: "station_1",
     number: 1,
-    title: "Station 1: Cold Engine Bay & Fluids",
-    short_title: "1. Fluids & Cold Bay",
+    title: "Cold Engine Bay & Fluids",
+    short_title: "Fluids",
     description: "Inspect primary fluid conditions, caps, and electrical connections before cranking engine.",
     icon_name: "Droplets",
     items: [
@@ -26,9 +26,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Remove the engine oil cap and photograph the underside. Inspect for milky caramel/yellow foam (mayonnaise texture).",
         rubric_summary: [
-          { label: "Clean, amber / dry", points: 2 },
-          { label: "Dark carbon varnish", points: -2 },
-          { label: "Milkshake, foamy", points: -10, is_walk: true },
+          { label: "Clean, amber / dry", points: 2, explanation: "Clean with light oil film and zero emulsified sludge." },
+          { label: "Dark carbon varnish", points: -2, explanation: "Dark carbon varnish present, indicating extended drain intervals.", negotiation_tip: "Request $150 credit for an engine oil flush and fresh synthetic oil change." },
+          { label: "Milkshake, foamy", points: -10, is_walk: true, explanation: "Yellow-white mayonnaise emulsion indicates coolant mixing with engine oil.", negotiation_tip: "WALK AWAY. Severe head gasket failure or cracked block. Do not negotiate." },
         ],
         status: "uninspected",
         points: 0,
@@ -42,10 +42,10 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Pull the dipstick, wipe once, reinsert, pull again and photograph the oil level indicator tip against clean light.",
         rubric_summary: [
-          { label: "Clean, amber level", points: 3 },
-          { label: "Dark, overdue oil", points: -2 },
-          { label: "Dry / Below min line", points: -4 },
-          { label: "Milkshake, foamy", points: -10, is_walk: true },
+          { label: "Clean, amber level", points: 3, explanation: "Oil level is at full mark with golden amber color." },
+          { label: "Dark, overdue oil", points: -2, explanation: "Engine oil is jet-black and overdue for routine service.", negotiation_tip: "Ask for a $100 maintenance credit for an oil and filter change." },
+          { label: "Dry / Below min line", points: -4, explanation: "Critically low oil level suggests neglected maintenance.", negotiation_tip: "Demand a $500 mechanical inspection credit." },
+          { label: "Milkshake, foamy", points: -10, is_walk: true, explanation: "Pale, frothy milkshake consistency indicates catastrophic coolant intrusion.", negotiation_tip: "WALK AWAY IMMEDIATELY. Blown head gasket or cracked engine block." },
         ],
         status: "uninspected",
         points: 0,
@@ -59,9 +59,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph into the plastic coolant overflow expansion tank. Verify fluid clarity and absence of dark oil scum.",
         rubric_summary: [
-          { label: "Bright OEM clean", points: 2 },
-          { label: "Murky / sediment", points: -2 },
-          { label: "Oil slick / milky mix", points: -10, is_walk: true },
+          { label: "Bright OEM clean", points: 2, explanation: "Coolant is clean, transparent OEM color without sediment." },
+          { label: "Murky / sediment", points: -2, explanation: "Coolant shows dark sediment requiring a cooling system flush.", negotiation_tip: "Request $200 off for a cooling system pressure test and flush." },
+          { label: "Oil slick / milky mix", points: -10, is_walk: true, explanation: "Black oil film floating on coolant or milky slurry in overflow tank.", negotiation_tip: "WALK AWAY. Oil cooler rupture or blown head gasket breach." },
         ],
         status: "uninspected",
         points: 0,
@@ -75,9 +75,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph the translucent brake master cylinder reservoir under hood lighting.",
         rubric_summary: [
-          { label: "Clear / light honey", points: 2 },
-          { label: "Dark brown / moisture", points: -2 },
-          { label: "Pitch black / sediment", points: -4 },
+          { label: "Clear / light honey", points: 2, explanation: "Brake fluid is light golden amber and moisture-free." },
+          { label: "Dark brown / moisture", points: -2, explanation: "Brake fluid is dark brown indicating moisture absorption (>3%).", negotiation_tip: "Ask for a $150 credit for a hydraulic brake fluid flush." },
+          { label: "Pitch black / sediment", points: -4, explanation: "Brake fluid is pitch black with rubber seal degradation sediment.", negotiation_tip: "Deduct $350 for master cylinder inspection and brake service." },
         ],
         status: "uninspected",
         points: 0,
@@ -91,9 +91,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph top of 12V battery showing both terminals and the circular date manufacturing stamp.",
         rubric_summary: [
-          { label: "Clean, sealed posts (<3 yrs)", points: 2 },
-          { label: "Minor acid crust", points: -1 },
-          { label: "Heavy corroded crust (5+ yrs)", points: -3 },
+          { label: "Clean, sealed posts (<3 yrs)", points: 2, explanation: "Terminals tight and clean; battery is under 3 years old." },
+          { label: "Minor acid crust", points: -1, explanation: "Light powdery white/blue oxidation around battery terminal clamps.", negotiation_tip: "Ask for $50 terminal cleaning and protector application." },
+          { label: "Heavy corroded crust (5+ yrs)", points: -3, explanation: "Severe sulfuric acid blooming and bloated battery casing.", negotiation_tip: "Deduct $220 for a new AGM battery replacement." },
         ],
         status: "uninspected",
         points: 0,
@@ -104,8 +104,8 @@ const INITIAL_STATIONS: Station[] = [
   {
     id: "station_2",
     number: 2,
-    title: "Station 2: Engine Mechanical & Acoustic",
-    short_title: "2. Engine & Acoustics",
+    title: "Engine Mechanical & Acoustics",
+    short_title: "Engine & Sound",
     description: "Diagnose mechanical gaskets, seals, and run Audio Spectrogram Transformer (AST) acoustic scans.",
     icon_name: "Activity",
     items: [
@@ -117,9 +117,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Point camera at the front engine timing cover aluminum perimeter seam between cylinder head and block.",
         rubric_summary: [
-          { label: "Bone dry", points: 3 },
-          { label: "Slightly damp", points: -2 },
-          { label: "Wet, grimy", points: -5 },
+          { label: "Bone dry", points: 3, explanation: "Timing cover metal seam is dry without oil weeping." },
+          { label: "Slightly damp", points: -2, explanation: "Timing cover shows faint oil sweat along aluminum mating edge.", negotiation_tip: "Point out timing cover seepage. Resealing requires engine support disassembly ($1,200-$1,800)." },
+          { label: "Wet, grimy", points: -5, explanation: "Seam is coated with wet engine oil and road grime dripping onto lower block.", negotiation_tip: "Require a $1,800 price reduction to cover timing cover reseal." },
         ],
         status: "uninspected",
         points: 0,
@@ -133,9 +133,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph the perimeter seal of the valve cover, especially above exhaust manifold heat shields.",
         rubric_summary: [
-          { label: "Bone dry / clean", points: 2 },
-          { label: "Weeping around bolts", points: -2 },
-          { label: "Heavy pooled oil", points: -4 },
+          { label: "Bone dry / clean", points: 2, explanation: "Perimeter of valve cover is dry and clean." },
+          { label: "Weeping around bolts", points: -2, explanation: "Valve cover gasket has hardened with visible oil sweating.", negotiation_tip: "Deduct $350 for valve cover gasket and tube seal replacement." },
+          { label: "Heavy pooled oil", points: -4, explanation: "Active oil pooling on exhaust heat shield with smoke risk.", negotiation_tip: "Deduct $650 for valve cover reseal and degreasing." },
         ],
         status: "uninspected",
         points: 0,
@@ -149,9 +149,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "audio",
         instruction: "Hold phone microphone 12-18 inches above engine valve cover for 5 seconds while vehicle idles in Park.",
         rubric_summary: [
-          { label: "Healthy harmonic idle", points: 3 },
-          { label: "Lifter tick / Vacuum leak", points: -2 },
-          { label: "Rod knock / Bearing failure", points: -10, is_walk: true },
+          { label: "Healthy harmonic idle", points: 3, explanation: "Smooth valvetrain acoustics and balanced combustion cycles." },
+          { label: "Lifter tick / Vacuum leak", points: -2, explanation: "High frequency ticking or intake vacuum hiss detected.", negotiation_tip: "Request $400 diagnostic and intake smoke test credit." },
+          { label: "Rod knock / Bearing failure", points: -10, is_walk: true, explanation: "Heavy low-frequency double knock from connecting rod journal bearing.", negotiation_tip: "WALK AWAY. Catastrophic engine bottom-end failure imminent." },
         ],
         status: "uninspected",
         points: 0,
@@ -165,9 +165,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "audio",
         instruction: "Have assistant blip throttle smoothly to 2,500 RPM and release while recording engine decel resonance.",
         rubric_summary: [
-          { label: "Linear spool & smooth decel", points: 2 },
-          { label: "Timing chain rattle / Misfire", points: -4 },
-          { label: "Turbo siren / Piston slap", points: -5 },
+          { label: "Linear spool & smooth decel", points: 2, explanation: "Harmonic acceleration ramp with smooth decel return." },
+          { label: "Timing chain rattle / Misfire", points: -4, explanation: "Rattling noise on decel indicates loose timing chain guide.", negotiation_tip: "Deduct $1,200 for timing chain tensioner and guide replacement." },
+          { label: "Turbo siren / Piston slap", points: -5, explanation: "High-pitched siren whistle or cold cylinder bore slap.", negotiation_tip: "Deduct $1,800 for turbocharger or cylinder evaluation." },
         ],
         status: "uninspected",
         points: 0,
@@ -181,9 +181,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Take a focused close-up photo of the ribbed side of the serpentine accessory drive belt.",
         rubric_summary: [
-          { label: "Supple, ribbed, no cracks", points: 2 },
-          { label: "Micro-cracks / dry rot", points: -2 },
-          { label: "Frayed edges / misaligned", points: -3 },
+          { label: "Supple, ribbed, no cracks", points: 2, explanation: "Belt rubber is pliable with crisp grooves and zero dry rot." },
+          { label: "Micro-cracks / dry rot", points: -2, explanation: "Belt ribs show micro-cracking (>3 cracks per inch).", negotiation_tip: "Deduct $150 for serpentine belt replacement." },
+          { label: "Frayed edges / misaligned", points: -3, explanation: "Belt edges frayed due to misaligned pulley or worn tensioner.", negotiation_tip: "Deduct $350 for belt and automatic tensioner assembly." },
         ],
         status: "uninspected",
         points: 0,
@@ -194,8 +194,8 @@ const INITIAL_STATIONS: Station[] = [
   {
     id: "station_3",
     number: 3,
-    title: "Station 3: Underbody, Drivetrain & Suspension",
-    short_title: "3. Underbody & Suspension",
+    title: "Underbody, Drivetrain & Suspension",
+    short_title: "Underbody",
     description: "Examine CV axles, oil pan drips, structural subframe rust, and hydraulic dampers.",
     icon_name: "ShieldAlert",
     items: [
@@ -207,9 +207,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Turn steering wheel fully to lock and photograph the rubber accordion CV axle boots behind the wheel.",
         rubric_summary: [
-          { label: "Intact, supple, sealed", points: 2 },
-          { label: "Surface hairline checks", points: -1 },
-          { label: "Torn, slinging dark grease", points: -3 },
+          { label: "Intact, supple, sealed", points: 2, explanation: "Accordion boots are supple and securely clamped with zero grease leakage." },
+          { label: "Surface hairline checks", points: -1, explanation: "Minor superficial rubber surface weather checking; boot intact.", negotiation_tip: "Note aging rubber boots to monitor at next service." },
+          { label: "Torn, slinging dark grease", points: -3, explanation: "CV boot split open, slinging grease onto wheel well and brake.", negotiation_tip: "Deduct $450 per side for front CV axle shaft replacement." },
         ],
         status: "uninspected",
         points: 0,
@@ -223,9 +223,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Kneel and photograph underside of engine oil pan and transmission bellhousing joint with flash on.",
         rubric_summary: [
-          { label: "Clean, dry metal", points: 3 },
-          { label: "Minor oil seepage", points: -2 },
-          { label: "Active dripping / wet casing", points: -5 },
+          { label: "Clean, dry metal", points: 3, explanation: "Underside of oil pan and bellhousing are bone dry." },
+          { label: "Minor oil seepage", points: -2, explanation: "Mild oil film accumulation around oil pan seal.", negotiation_tip: "Deduct $400 for oil pan gasket reseal." },
+          { label: "Active dripping / wet casing", points: -5, explanation: "Active hanging droplets at rear main seal.", negotiation_tip: "Rear main seal requires transmission removal ($1,500). Demand deducted." },
         ],
         status: "uninspected",
         points: 0,
@@ -239,9 +239,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph the front suspension subframe cradle and unibody frame rail pinch welds.",
         rubric_summary: [
-          { label: "Clean paint / e-coat", points: 3 },
-          { label: "Light surface patina", points: 0 },
-          { label: "Perforated rot / flaky rust", points: -10, is_walk: true },
+          { label: "Clean paint / e-coat", points: 3, explanation: "Underbody rails show factory e-coat with zero structural corrosion." },
+          { label: "Light surface patina", points: 0, explanation: "Minor cosmetic orange surface patina; structural metal is solid.", negotiation_tip: "Standard road patina; ask $100 for lanolin protectant." },
+          { label: "Perforated rot / flaky rust", points: -10, is_walk: true, explanation: "Structural metal delamination or hole perforation in subframe.", negotiation_tip: "WALK AWAY. Severe structural safety hazard." },
         ],
         status: "uninspected",
         points: 0,
@@ -255,9 +255,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph through the wheel opening at the chrome piston shaft and body of the front strut assembly.",
         rubric_summary: [
-          { label: "Dry shaft, firm dampening", points: 2 },
-          { label: "Hydraulic oil misting", points: -2 },
-          { label: "Wet dripping blown strut", points: -4 },
+          { label: "Dry shaft, firm dampening", points: 2, explanation: "Hydraulic strut piston shafts are mirror dry." },
+          { label: "Hydraulic oil misting", points: -2, explanation: "Strut housing shows oil mist attracting road dirt.", negotiation_tip: "Deduct $550 for front strut pair replacement." },
+          { label: "Wet dripping blown strut", points: -4, explanation: "Damper internal hydraulic seal blown with oil running down perch.", negotiation_tip: "Deduct $850 for front strut assemblies and alignment." },
         ],
         status: "uninspected",
         points: 0,
@@ -268,8 +268,8 @@ const INITIAL_STATIONS: Station[] = [
   {
     id: "station_4",
     number: 4,
-    title: "Station 4: Exterior, Structural & Tires",
-    short_title: "4. Exterior & Frame",
+    title: "Exterior, Structural & Tires",
+    short_title: "Exterior",
     description: "Detect panel gaps, collision damage, inner apron welds, body filler Bondo, and tire wear.",
     icon_name: "Cpu",
     items: [
@@ -281,9 +281,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph down the line between hood and front fender on both left and right sides to check symmetry.",
         rubric_summary: [
-          { label: "Uniform 3-4mm laser aligned", points: 2 },
-          { label: "Minor uneven gap (5-6mm)", points: -2 },
-          { label: "Crooked / rubbing panels", points: -4 },
+          { label: "Uniform 3-4mm laser aligned", points: 2, explanation: "Body panel gaps are straight, parallel, and even (3-4mm)." },
+          { label: "Minor uneven gap (5-6mm)", points: -2, explanation: "Fender gap widens near headlight from minor panel adjustment.", negotiation_tip: "Deduct $200 for body shop panel alignment." },
+          { label: "Crooked / rubbing panels", points: -4, explanation: "Severe misalignment with hood rubbing fender, indicating structural repair.", negotiation_tip: "Demand a $2,000 accident history discount." },
         ],
         status: "uninspected",
         points: 0,
@@ -297,9 +297,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "With hood open, photograph the inner fender sheet metal aprons and radiator upper support tie bar.",
         rubric_summary: [
-          { label: "Factory spot welds & sealer", points: 3 },
-          { label: "Minor plastic clip broken", points: -1 },
-          { label: "Kinked metal / aftermarket welds", points: -10, is_walk: true },
+          { label: "Factory spot welds & sealer", points: 3, explanation: "Core support and inner aprons show factory spot welds and OEM sealer." },
+          { label: "Minor plastic clip broken", points: -1, explanation: "Upper plastic beauty cover has a missing fastener; metal structure intact.", negotiation_tip: "Minor cosmetic clip issue ($15)." },
+          { label: "Kinked metal / aftermarket welds", points: -10, is_walk: true, explanation: "Crinkled sheet metal, clamp pull marks, or manual MIG weld beads.", negotiation_tip: "WALK AWAY. Severe structural unibody crash damage." },
         ],
         status: "uninspected",
         points: 0,
@@ -313,9 +313,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph reflections along doors and quarter panels at a 45-degree angle to detect waviness or body filler.",
         rubric_summary: [
-          { label: "Consistent factory orange peel", points: 2 },
-          { label: "Repainted panel / overspray", points: -2 },
-          { label: "Heavy bondo mud / bubbling rust", points: -4 },
+          { label: "Consistent factory orange peel", points: 2, explanation: "Paint gloss and texture match factory standards with no tape lines." },
+          { label: "Repainted panel / overspray", points: -2, explanation: "Slight clearcoat tape line on door jamb indicating prior respray.", negotiation_tip: "Deduct $300 for cosmetic blend and correction." },
+          { label: "Heavy bondo mud / bubbling rust", points: -4, explanation: "Dull reflection with thick body filler and rust blisters emerging.", negotiation_tip: "Deduct $800 for rust repair and panel refinishing." },
         ],
         status: "uninspected",
         points: 0,
@@ -329,9 +329,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph tire tread across the contact patch showing both inner shoulder and center groove wear bars.",
         rubric_summary: [
-          { label: "Even 6/32\"+ tread depth", points: 2 },
-          { label: "Inner / outer shoulder bald", points: -3 },
-          { label: "Severe dry rot / sidewall bubble", points: -4 },
+          { label: "Even 6/32\"+ tread depth", points: 2, explanation: "Healthy, uniform tread depth (>6/32\") without abnormal shoulder wear." },
+          { label: "Inner / outer shoulder bald", points: -3, explanation: "Inner tire shoulder worn to wear bars from negative camber or toe issue.", negotiation_tip: "Deduct $650 for two new front tires and alignment." },
+          { label: "Severe dry rot / sidewall bubble", points: -4, explanation: "Impact bubble in tire sidewall indicating imminent blowout danger.", negotiation_tip: "Deduct $800 for full set of replacement tires." },
         ],
         status: "uninspected",
         points: 0,
@@ -342,8 +342,8 @@ const INITIAL_STATIONS: Station[] = [
   {
     id: "station_5",
     number: 5,
-    title: "Station 5: Cabin, OBD-II & Road Test",
-    short_title: "5. Cabin & Road Test",
+    title: "Cabin, OBD-II & Road Test",
+    short_title: "Road Test",
     description: "Check cold start exhaust smoke, instrument warning lights, transmission shift quality, and HVAC.",
     icon_name: "Gauge",
     items: [
@@ -355,10 +355,10 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph exhaust tailpipe plume 10 seconds after cold engine ignition startup.",
         rubric_summary: [
-          { label: "Clear / brief water vapor", points: 2 },
-          { label: "Black sooty / rich mixture", points: -3 },
-          { label: "Blue puff / oil consumption", points: -10, is_walk: true },
-          { label: "Billowing sweet white smoke", points: -10, is_walk: true },
+          { label: "Clear / brief water vapor", points: 2, explanation: "Exhaust is clear with brief normal cold water vapor." },
+          { label: "Black sooty / rich mixture", points: -3, explanation: "Black carbon smoke on acceleration indicating rich fuel mixture.", negotiation_tip: "Deduct $400 for fuel system diagnosis and O2 sensor." },
+          { label: "Blue puff / oil consumption", points: -10, is_walk: true, explanation: "Bluish-grey oil smoke on cold startup indicating worn valve seals/rings.", negotiation_tip: "WALK AWAY. Internal engine oil burning ($3,000+ rebuild)." },
+          { label: "Billowing sweet white smoke", points: -10, is_walk: true, explanation: "Thick sweet-smelling white smoke proving coolant burning in cylinders.", negotiation_tip: "WALK AWAY IMMEDIATELY. Blown head gasket or cracked head." },
         ],
         status: "uninspected",
         points: 0,
@@ -372,10 +372,10 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Photograph instrument gauge cluster with engine running to confirm zero illuminated fault lamps.",
         rubric_summary: [
-          { label: "All bulbs self-test & extinguish", points: 3 },
-          { label: "TPMS / minor maintenance lamp", points: -1 },
-          { label: "ABS / Airbag SRS light ON", points: -4 },
-          { label: "Check Engine Light ON", points: -5 },
+          { label: "All bulbs self-test & extinguish", points: 3, explanation: "All warning lamps illuminate on test and extinguish when running." },
+          { label: "TPMS / minor maintenance lamp", points: -1, explanation: "Tire pressure monitoring lamp or oil service reminder on.", negotiation_tip: "Request $75 credit for TPMS sensor replacement." },
+          { label: "ABS / Airbag SRS light ON", points: -4, explanation: "SRS airbag or ABS safety fault lamp illuminated.", negotiation_tip: "Deduct $650 for safety restraint module diagnosis and repair." },
+          { label: "Check Engine Light ON", points: -5, explanation: "Malfunction Indicator Lamp illuminated with active ECU DTC codes.", negotiation_tip: "Demand $800 - $1,500 deduction for OBD-II emission diagnostic and repairs." },
         ],
         status: "uninspected",
         points: 0,
@@ -389,9 +389,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "With foot on brake at idle, shift from Park to Reverse, then to Drive. Note delay and photograph shifter console.",
         rubric_summary: [
-          { label: "Crisp, immediate lock-in (<0.5s)", points: 2 },
-          { label: "Slight hesitation (1.0s)", points: -2 },
-          { label: "Hard violent clunk / slipping delay", points: -5 },
+          { label: "Crisp, immediate lock-in (<0.5s)", points: 2, explanation: "Transmission shifts into Drive and Reverse smoothly in under 0.5s." },
+          { label: "Slight hesitation (1.0s)", points: -2, explanation: "Mild hydraulic delay before reverse catches.", negotiation_tip: "Deduct $250 for transmission fluid and filter exchange." },
+          { label: "Hard violent clunk / slipping delay", points: -5, explanation: "2+ second engagement lag followed by harsh violent clunk into gear.", negotiation_tip: "Deduct $2,500 - $4,000 for transmission overhaul or walk away." },
         ],
         status: "uninspected",
         points: 0,
@@ -405,9 +405,9 @@ const INITIAL_STATIONS: Station[] = [
         media_type: "image",
         instruction: "Turn A/C to max cold, recirculate on; photograph dash center vent showing climate controls.",
         rubric_summary: [
-          { label: "Sub-45°F A/C & boiling heat", points: 2 },
-          { label: "Slow cooling (55°F)", points: -2 },
-          { label: "Hot air only / Compressor dead", points: -4 },
+          { label: "Sub-45°F A/C & boiling heat", points: 2, explanation: "A/C vent delivers rapid temp under 45°F; heater blows strong hot air." },
+          { label: "Slow cooling (55°F)", points: -2, explanation: "A/C takes several minutes and only reaches 55°F.", negotiation_tip: "Deduct $200 for A/C system evacuation and recharge." },
+          { label: "Hot air only / Compressor dead", points: -4, explanation: "A/C blows ambient/hot air with clutch not engaging.", negotiation_tip: "Deduct $900 for A/C compressor and condenser replacement." },
         ],
         status: "uninspected",
         points: 0,
@@ -427,53 +427,64 @@ const INITIAL_VEHICLE: VehicleProfile = {
   vin: "4T3BK3BB0FU123456",
 };
 
-export interface PendingItem {
-  itemId: string;
-  stationId: string;
-  blobData: string; // Base64 representation
-  mediaType: "image" | "audio";
-  context?: string;
-  createdAt: string;
+interface WalkAwayReason {
+  componentName: string;
+  explanation: string;
 }
 
 interface InspectionState {
   vehicle: VehicleProfile;
   stations: Station[];
   activeStationId: string;
-  selectedItemId: string | null;
-  walkModalOpen: boolean;
-  walkModalItem: ChecklistItem | null;
+  
+  // Modals & Active Targets
+  activeCaptureItemId: string | null;
+  cameraModalOpen: boolean;
+  audioModalOpen: boolean;
+  walkAwayModalOpen: boolean;
+  walkAwayReason: WalkAwayReason | null;
   reportModalOpen: boolean;
   vehicleEditModalOpen: boolean;
-  pendingQueue: PendingItem[];
-  
+
   // Actions
   updateVehicle: (patch: Partial<VehicleProfile>) => void;
   setActiveStation: (stationId: string) => void;
-  setSelectedItemId: (itemId: string | null) => void;
-  setWalkModalOpen: (open: boolean, item?: ChecklistItem | null) => void;
+  openCameraModal: (itemId: string) => void;
+  closeCameraModal: () => void;
+  openAudioModal: (itemId: string) => void;
+  closeAudioModal: () => void;
+  openWalkAwayModal: (componentName: string, explanation: string) => void;
+  closeWalkAwayModal: () => void;
   setReportModalOpen: (open: boolean) => void;
   setVehicleEditModalOpen: (open: boolean) => void;
-  
-  // Inspection Results
-  recordVisualResult: (itemId: string, result: VisualInspectionResult, previewUrl?: string) => void;
-  recordAudioResult: (itemId: string, result: AudioInspectionResult, previewUrl?: string) => void;
-  setItemStatus: (itemId: string, status: ChecklistItem["status"]) => void;
-  enqueuePending: (pending: PendingItem) => void;
-  removePending: (itemId: string) => void;
-  
-  // Reset & Scenarios
+
+  // Result Mutators
+  updateItemResult: (
+    itemId: string,
+    data: {
+      finding_category: string;
+      points: number;
+      is_walk_condition: boolean;
+      explanation?: string;
+      negotiation_tip?: string | null;
+      confidence?: number;
+      media_preview_url?: string;
+      audio_result?: AudioInspectionResult;
+      visual_result?: VisualInspectionResult;
+    }
+  ) => void;
+
+  quickScoreItem: (itemId: string, opt: RubricOption) => void;
   resetChecklist: () => void;
   loadDemoScenario: (scenario: "clean_pass" | "blown_head_gasket" | "rod_knock" | "high_negotiation") => void;
-  
-  // Computed helpers
+
+  // Computed Selectors
   getAllItems: () => ChecklistItem[];
   getTotalPoints: () => number;
+  hasWalkAwayCondition: () => boolean;
   getWalkConditions: () => ChecklistItem[];
   getCompletedCount: () => number;
   getProgressPercentage: () => number;
-  getStationById: (stationId: string) => Station | undefined;
-  getItemById: (itemId: string) => ChecklistItem | undefined;
 }
 
 export const useInspectionStore = create<InspectionState>()(
@@ -482,122 +493,88 @@ export const useInspectionStore = create<InspectionState>()(
       vehicle: INITIAL_VEHICLE,
       stations: INITIAL_STATIONS,
       activeStationId: "station_1",
-      selectedItemId: null,
-      walkModalOpen: false,
-      walkModalItem: null,
+      
+      activeCaptureItemId: null,
+      cameraModalOpen: false,
+      audioModalOpen: false,
+      walkAwayModalOpen: false,
+      walkAwayReason: null,
       reportModalOpen: false,
       vehicleEditModalOpen: false,
-      pendingQueue: [],
 
       updateVehicle: (patch) =>
         set((state) => ({ vehicle: { ...state.vehicle, ...patch } })),
 
       setActiveStation: (stationId) => set({ activeStationId: stationId }),
-      setSelectedItemId: (itemId) => set({ selectedItemId: itemId }),
-      setWalkModalOpen: (open, item = null) =>
-        set({ walkModalOpen: open, walkModalItem: item }),
+
+      openCameraModal: (itemId) =>
+        set({ activeCaptureItemId: itemId, cameraModalOpen: true }),
+      closeCameraModal: () =>
+        set({ activeCaptureItemId: null, cameraModalOpen: false }),
+
+      openAudioModal: (itemId) =>
+        set({ activeCaptureItemId: itemId, audioModalOpen: true }),
+      closeAudioModal: () =>
+        set({ activeCaptureItemId: null, audioModalOpen: false }),
+
+      openWalkAwayModal: (componentName, explanation) =>
+        set({
+          walkAwayModalOpen: true,
+          walkAwayReason: { componentName, explanation },
+        }),
+      closeWalkAwayModal: () =>
+        set({ walkAwayModalOpen: false, walkAwayReason: null }),
+
       setReportModalOpen: (open) => set({ reportModalOpen: open }),
       setVehicleEditModalOpen: (open) => set({ vehicleEditModalOpen: open }),
 
-      recordVisualResult: (itemId, result, previewUrl) => {
-        set((state) => {
-          let walkDetectedItem: ChecklistItem | null = null;
-          const updatedStations = state.stations.map((st) => ({
-            ...st,
-            items: st.items.map((it) => {
-              if (it.id === itemId) {
-                const isError = result.finding_category === "Error";
-                const updated: ChecklistItem = {
-                  ...it,
-                  status: isError ? "error" : "inspected",
-                  finding_category: result.finding_category,
-                  points: result.points,
-                  is_walk_condition: result.is_walk_condition,
-                  explanation: result.explanation,
-                  negotiation_tip: result.negotiation_tip,
-                  confidence: result.confidence,
-                  visual_result: result,
-                  media_preview_url: previewUrl || it.media_preview_url,
-                  last_inspected_at: new Date().toISOString(),
-                };
-                if (result.is_walk_condition) {
-                  walkDetectedItem = updated;
-                }
-                return updated;
-              }
-              return it;
-            }),
-          }));
-
-          return {
-            stations: updatedStations,
-            walkModalOpen: walkDetectedItem !== null ? true : state.walkModalOpen,
-            walkModalItem: walkDetectedItem !== null ? walkDetectedItem : state.walkModalItem,
-          };
-        });
-      },
-
-      recordAudioResult: (itemId, result, previewUrl) => {
-        set((state) => {
-          let walkDetectedItem: ChecklistItem | null = null;
-          const updatedStations = state.stations.map((st) => ({
-            ...st,
-            items: st.items.map((it) => {
-              if (it.id === itemId) {
-                const updated: ChecklistItem = {
-                  ...it,
-                  status: "inspected",
-                  finding_category: result.primary_condition,
-                  points: result.points,
-                  is_walk_condition: result.is_walk_condition,
-                  explanation: result.explanation,
-                  negotiation_tip: result.negotiation_tip,
-                  confidence: result.confidence,
-                  audio_result: result,
-                  media_preview_url: previewUrl || it.media_preview_url,
-                  last_inspected_at: new Date().toISOString(),
-                };
-                if (result.is_walk_condition) {
-                  walkDetectedItem = updated;
-                }
-                return updated;
-              }
-              return it;
-            }),
-          }));
-
-          return {
-            stations: updatedStations,
-            walkModalOpen: walkDetectedItem !== null ? true : state.walkModalOpen,
-            walkModalItem: walkDetectedItem !== null ? walkDetectedItem : state.walkModalItem,
-          };
-        });
-      },
-
-      setItemStatus: (itemId, status) => {
+      updateItemResult: (itemId, data) => {
         set((state) => ({
           stations: state.stations.map((st) => ({
             ...st,
-            items: st.items.map((it) => (it.id === itemId ? { ...it, status } : it)),
+            items: st.items.map((it) => {
+              if (it.id === itemId) {
+                return {
+                  ...it,
+                  status: "inspected" as const,
+                  finding_category: data.finding_category,
+                  points: data.points,
+                  is_walk_condition: data.is_walk_condition,
+                  explanation: data.explanation || it.explanation,
+                  negotiation_tip: data.negotiation_tip !== undefined ? data.negotiation_tip : it.negotiation_tip,
+                  confidence: data.confidence,
+                  media_preview_url: data.media_preview_url || it.media_preview_url,
+                  audio_result: data.audio_result,
+                  visual_result: data.visual_result,
+                  last_inspected_at: new Date().toISOString(),
+                };
+              }
+              return it;
+            }),
           })),
         }));
       },
 
-      enqueuePending: (pending) => {
+      quickScoreItem: (itemId, opt) => {
         set((state) => ({
-          pendingQueue: [...state.pendingQueue.filter((p) => p.itemId !== pending.itemId), pending],
           stations: state.stations.map((st) => ({
             ...st,
-            items: st.items.map((it) =>
-              it.id === pending.itemId ? { ...it, status: "pending" } : it
-            ),
+            items: st.items.map((it) => {
+              if (it.id === itemId) {
+                return {
+                  ...it,
+                  status: "inspected" as const,
+                  finding_category: opt.label,
+                  points: opt.points,
+                  is_walk_condition: !!opt.is_walk,
+                  explanation: opt.explanation || `Recorded ${opt.label}`,
+                  negotiation_tip: opt.negotiation_tip || null,
+                  last_inspected_at: new Date().toISOString(),
+                };
+              }
+              return it;
+            }),
           })),
-        }));
-      },
-
-      removePending: (itemId) => {
-        set((state) => ({
-          pendingQueue: state.pendingQueue.filter((p) => p.itemId !== itemId),
         }));
       },
 
@@ -605,10 +582,11 @@ export const useInspectionStore = create<InspectionState>()(
         set({
           stations: INITIAL_STATIONS,
           activeStationId: "station_1",
-          selectedItemId: null,
-          walkModalOpen: false,
-          walkModalItem: null,
-          pendingQueue: [],
+          activeCaptureItemId: null,
+          cameraModalOpen: false,
+          audioModalOpen: false,
+          walkAwayModalOpen: false,
+          walkAwayReason: null,
         });
       },
 
@@ -625,7 +603,7 @@ export const useInspectionStore = create<InspectionState>()(
                   finding_category: opt.label,
                   points: opt.points,
                   is_walk_condition: false,
-                  explanation: `Inspected: ${it.title} in excellent factory condition.`,
+                  explanation: opt.explanation || `Inspected ${it.title} in clean condition.`,
                   negotiation_tip: null,
                   confidence: 0.96,
                   last_inspected_at: new Date().toISOString(),
@@ -651,7 +629,7 @@ export const useInspectionStore = create<InspectionState>()(
                   finding_category: opt.label,
                   points: opt.points,
                   is_walk_condition: false,
-                  explanation: `Inspected: ${it.title} in standard condition.`,
+                  explanation: opt.explanation || `Inspected ${it.title} in standard condition.`,
                   negotiation_tip: null,
                   confidence: 0.94,
                   last_inspected_at: new Date().toISOString(),
@@ -661,7 +639,7 @@ export const useInspectionStore = create<InspectionState>()(
                   return {
                     ...it,
                     status: "inspected" as const,
-                    finding_category: "Rod Knock",
+                    finding_category: "Rod knock / Bearing failure",
                     points: -10,
                     is_walk_condition: true,
                     explanation: "Heavy percussive bottom-end double knock from cylinder 3 connecting rod bearing.",
@@ -677,13 +655,12 @@ export const useInspectionStore = create<InspectionState>()(
                   finding_category: opt.label,
                   points: opt.points,
                   is_walk_condition: false,
-                  explanation: `Inspected: ${it.title} in standard condition.`,
+                  explanation: opt.explanation || `Inspected ${it.title} in standard condition.`,
                   negotiation_tip: null,
                   confidence: 0.92,
                   last_inspected_at: new Date().toISOString(),
                 };
               } else {
-                // High negotiation scenario (Multiple minor wear items)
                 if (it.id === "s2_timing_cover") {
                   return {
                     ...it,
@@ -730,7 +707,7 @@ export const useInspectionStore = create<InspectionState>()(
                   finding_category: opt.label,
                   points: opt.points,
                   is_walk_condition: false,
-                  explanation: `Inspected: ${it.title} in acceptable condition.`,
+                  explanation: opt.explanation || `Inspected ${it.title} in acceptable condition.`,
                   negotiation_tip: null,
                   confidence: 0.94,
                   last_inspected_at: new Date().toISOString(),
@@ -746,8 +723,10 @@ export const useInspectionStore = create<InspectionState>()(
 
           return {
             stations: updatedStations,
-            walkModalOpen: hasWalk,
-            walkModalItem: walkItem,
+            walkAwayModalOpen: hasWalk,
+            walkAwayReason: walkItem
+              ? { componentName: walkItem.title, explanation: walkItem.explanation || "" }
+              : null,
           };
         });
       },
@@ -758,6 +737,10 @@ export const useInspectionStore = create<InspectionState>()(
           .getAllItems()
           .filter((i) => i.status === "inspected")
           .reduce((sum, i) => sum + i.points, 0),
+      hasWalkAwayCondition: () =>
+        get()
+          .getAllItems()
+          .some((i) => i.status === "inspected" && i.is_walk_condition),
       getWalkConditions: () =>
         get()
           .getAllItems()
@@ -772,15 +755,9 @@ export const useInspectionStore = create<InspectionState>()(
         const completed = get().getCompletedCount();
         return Math.round((completed / total) * 100);
       },
-      getStationById: (stationId) =>
-        get().stations.find((s) => s.id === stationId),
-      getItemById: (itemId) =>
-        get()
-          .getAllItems()
-          .find((i) => i.id === itemId),
     }),
     {
-      name: "car-inspector-store-v1",
+      name: "car-inspect-store-v2",
       storage: createJSONStorage(() => localStorage),
     }
   )

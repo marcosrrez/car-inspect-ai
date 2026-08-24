@@ -1,24 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   X,
   Printer,
+  AlertOctagon,
+  CheckCircle2,
+  AlertTriangle,
   Copy,
   Check,
-  AlertOctagon,
-  AlertTriangle,
-  TrendingDown,
-  DollarSign,
-  Car,
-  CheckCircle2,
-  Sparkles,
-  ShieldCheck,
-  ShieldAlert,
-  Download,
+  RotateCcw,
 } from "lucide-react";
-import confetti from "canvas-confetti";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { generateOverallReport } from "../utils/apiClient";
 import { OverallReportSummary } from "../types/inspection";
@@ -27,313 +20,251 @@ export const InspectionReportModal: React.FC = () => {
   const {
     reportModalOpen,
     setReportModalOpen,
-    vehicle,
     getAllItems,
+    vehicle,
     getTotalPoints,
-    getWalkConditions,
     getCompletedCount,
+    hasWalkAwayCondition,
+    resetChecklist,
   } = useInspectionStore();
 
-  const [reportData, setReportData] = useState<OverallReportSummary | null>(null);
+  const [report, setReport] = useState<OverallReportSummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const items = getAllItems();
   const completedCount = getCompletedCount();
-  const walkItems = getWalkConditions();
+  const totalScore = getTotalPoints();
+  const hasFatal = hasWalkAwayCondition();
 
   useEffect(() => {
     if (reportModalOpen) {
-      loadReport();
+      fetchReport();
     }
   }, [reportModalOpen]);
 
-  const loadReport = async () => {
+  const fetchReport = async () => {
     setLoading(true);
     try {
-      const data = await generateOverallReport(items, vehicle);
-      setReportData(data);
-
-      // Trigger celebratory confetti if Grade is A/A+ and all items inspected
-      if (data.grade.startsWith("A") && data.walk_conditions_count === 0) {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-      }
-    } catch (err) {
-      console.error("Report generation error:", err);
+      const summary = await generateOverallReport(items, vehicle);
+      setReport(summary);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleCopySummary = () => {
-    if (!reportData) return;
-    const lines = [
-      `🚗 PRE-PURCHASE INSPECTION REPORT: ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}`,
-      `VIN: ${vehicle.vin || "N/A"} | Mileage: ${vehicle.mileage?.toLocaleString()} mi | Asking Price: $${vehicle.asking_price?.toLocaleString()}`,
-      `----------------------------------------------------`,
-      `Overall Grade: ${reportData.grade}`,
-      `Verdict: ${reportData.verdict}`,
-      `Health Score: ${reportData.health_percentage}% (Score Tally: ${reportData.total_score > 0 ? "+" : ""}${reportData.total_score} pts)`,
-      `Walk Conditions: ${reportData.walk_conditions_count}`,
-      `Estimated Repairs: $${reportData.total_estimated_repairs_usd.toLocaleString()}`,
-      `Recommended Offer: $${reportData.recommended_offer_usd.toLocaleString()}`,
-      `----------------------------------------------------`,
-      `DEALER NEGOTIATION TALKING POINTS:`,
-      ...reportData.dealer_negotiation_script.map(
-        (s, idx) => `${idx + 1}. [${s.component}]: ${s.talking_point} (Est. Repair: $${s.estimated_repair_cost})`
-      ),
-    ];
-    navigator.clipboard.writeText(lines.join("\n"));
-    setCopiedSummary(true);
-    setTimeout(() => setCopiedSummary(false), 2000);
+  const handleCopy = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   if (!reportModalOpen) return null;
 
-  const isWalk = walkItems.length > 0;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 print:p-0 print:bg-white">
-      <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[95vh] print:max-h-none print:border-none print:shadow-none print:text-black print:bg-white">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-3xl min-h-screen sm:min-h-0 sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-200/80 my-auto animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 print:bg-white print:border-b-2 print:border-black">
+        <div className="flex items-center justify-between pb-5 border-b border-zinc-100 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center print:border-black print:text-black">
+            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-[11px] font-semibold tracking-wider text-orange-400 uppercase print:text-black">
-                Comprehensive Diagnostic Report
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-orange-600">
+                Inspection Summary
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-white print:text-black">
-                {vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim}
+              <h2 className="text-xl font-bold text-zinc-900">
+                {vehicle.year} {vehicle.make} {vehicle.model}
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 print:hidden">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleCopySummary}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
+              onClick={() => window.print()}
+              className="h-9 px-3.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 text-xs font-medium text-zinc-700 flex items-center gap-1.5 transition"
             >
-              {copiedSummary ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedSummary ? "Copied!" : "Copy Text"}</span>
-            </button>
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print / PDF</span>
+              <Printer className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="hidden sm:inline">Print / PDF</span>
             </button>
             <button
               onClick={() => setReportModalOpen(false)}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-400 hover:text-zinc-900 flex items-center justify-center transition"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Body Content */}
-        <div className="p-4 sm:p-6 space-y-6 overflow-y-auto print:overflow-visible">
-          {/* Executive Scorecard Header Card */}
-          <div
-            className={`p-5 sm:p-6 rounded-2xl border ${
-              isWalk
-                ? "bg-red-950/30 border-red-500/50 text-red-200"
-                : reportData?.grade.startsWith("A")
-                ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-200"
-                : "bg-amber-950/30 border-amber-500/40 text-amber-200"
-            }`}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-              {/* Grade Badge */}
-              <div className="text-center md:border-r border-slate-700/50 pr-4">
-                <div className="text-xs uppercase font-bold text-slate-400 mb-1">
-                  Overall Health Grade
-                </div>
-                <div
-                  className={`text-4xl sm:text-5xl font-black tracking-tight ${
-                    isWalk
-                      ? "text-red-400"
-                      : reportData?.grade.startsWith("A")
-                      ? "text-emerald-400"
-                      : "text-amber-400"
-                  }`}
-                >
-                  {reportData?.grade || (isWalk ? "F (WALK)" : "B")}
-                </div>
-                <div className="text-xs font-bold mt-1 text-white">
-                  {reportData?.verdict || (isWalk ? "WALK AWAY - DEAL BREAKER" : "FAIR / NEGOTIATE")}
-                </div>
-              </div>
-
-              {/* Score Stats */}
-              <div className="space-y-1 text-center sm:text-left">
-                <div className="text-xs text-slate-400 font-medium">Diagnostic Score:</div>
-                <div className="text-2xl font-mono font-bold text-white">
-                  {reportData?.total_score && reportData.total_score > 0 ? `+${reportData.total_score}` : reportData?.total_score || 0} pts
-                </div>
-                <div className="text-xs text-slate-400">
-                  Inspected: {completedCount} / 20 Checklist Items
-                </div>
-              </div>
-
-              {/* Estimated Repairs */}
-              <div className="space-y-1 text-center sm:text-left">
-                <div className="text-xs text-slate-400 font-medium">Estimated Immediate Repairs:</div>
-                <div className="text-2xl font-mono font-bold text-amber-400">
-                  ${reportData?.total_estimated_repairs_usd.toLocaleString() || "0"}
-                </div>
-                <div className="text-xs text-slate-400">
-                  Based on itemized mechanic rates
-                </div>
-              </div>
-
-              {/* Recommended Offer */}
-              <div className="space-y-1 text-center sm:text-left">
-                <div className="text-xs text-slate-400 font-medium">Recommended Max Offer:</div>
-                <div className="text-2xl font-mono font-bold text-emerald-400">
-                  {isWalk ? "$0 (PASS)" : `$${reportData?.recommended_offer_usd.toLocaleString() || "N/A"}`}
-                </div>
-                <div className="text-xs text-slate-400">
-                  Asking: ${vehicle.asking_price.toLocaleString()}
-                </div>
-              </div>
+        {/* Hero Scorecard Card */}
+        <div className="my-6 p-6 rounded-3xl bg-zinc-50 border border-zinc-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+              Vehicle Health Verdict
             </div>
-          </div>
-
-          {/* Deal Breaker Alert Section if flagged */}
-          {isWalk && (
-            <div className="p-4 rounded-xl bg-red-950/40 border-2 border-red-500 space-y-3">
-              <div className="flex items-center gap-2 font-black text-red-400 text-sm uppercase">
-                <AlertOctagon className="w-5 h-5 animate-pulse" />
-                <span>Fatal Deal-Breaker Summary ({walkItems.length} Flagged)</span>
-              </div>
-              <ul className="space-y-2">
-                {walkItems.map((w) => (
-                  <li key={w.id} className="p-3 rounded-lg bg-black/40 border border-red-500/30 text-xs">
-                    <div className="font-bold text-red-200">
-                      {w.title}: <span className="underline">{w.finding_category}</span>
-                    </div>
-                    <p className="text-slate-300 mt-1">{w.explanation}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Dealer Negotiation Script Generator */}
-          {reportData && reportData.dealer_negotiation_script.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-orange-400" />
-                  <span>Dealer Negotiation Talking Points & Repair Deductions</span>
-                </h3>
-                <span className="text-xs font-mono text-amber-400 font-semibold">
-                  Total Deductions: ${reportData.total_estimated_repairs_usd.toLocaleString()}
+            <div className="text-2xl sm:text-3xl font-extrabold text-zinc-900 flex items-center gap-2">
+              {hasFatal ? (
+                <span className="text-red-600 flex items-center gap-2">
+                  <AlertOctagon className="w-7 h-7 text-red-600" />
+                  WALK AWAY
                 </span>
-              </div>
-
-              <div className="space-y-2.5">
-                {reportData.dealer_negotiation_script.map((s, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200">
-                        {idx + 1}. {s.component} ({s.finding})
-                      </span>
-                      <span className="font-mono font-bold text-amber-400">
-                        -${s.estimated_repair_cost.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-850 text-orange-200 italic">
-                      &ldquo;{s.talking_point}&rdquo;
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ) : totalScore >= 20 ? (
+                <span className="text-emerald-600 flex items-center gap-2">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+                  EXCELLENT CONDITION
+                </span>
+              ) : (
+                <span className="text-amber-600 flex items-center gap-2">
+                  <AlertTriangle className="w-7 h-7 text-amber-600" />
+                  NEGOTIATION RECOMMENDED
+                </span>
+              )}
             </div>
-          )}
+            <p className="text-xs text-zinc-500 mt-1 max-w-md">
+              {hasFatal
+                ? "Severe mechanical/structural damage detected. Do not proceed with purchase."
+                : "Standard wear items identified. Use the talking points below during dealer negotiation."}
+            </p>
+          </div>
 
-          {/* Full 20-Point Checklist Itemized Breakdown */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white">
-              Itemized 20-Point Inspection Results
-            </h3>
-            <div className="border border-slate-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
-                  <tr>
-                    <th className="p-3">Component</th>
-                    <th className="p-3">Category</th>
-                    <th className="p-3 text-right">Points</th>
-                    <th className="p-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850">
-                  {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-950/40 transition">
-                      <td className="p-3 font-medium text-slate-200">
-                        {item.title}
-                      </td>
-                      <td className="p-3 text-slate-400">
-                        {item.finding_category || "Uninspected"}
-                      </td>
-                      <td
-                        className={`p-3 text-right font-mono font-bold ${
-                          item.is_walk_condition
-                            ? "text-red-400"
-                            : item.points > 0
-                            ? "text-emerald-400"
-                            : item.points < 0
-                            ? "text-amber-400"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {item.status === "inspected"
-                          ? item.is_walk_condition
-                            ? "WALK (-10)"
-                            : item.points > 0
-                            ? `+${item.points}`
-                            : item.points
-                          : "—"}
-                      </td>
-                      <td className="p-3 text-right">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                            item.status === "inspected"
-                              ? item.is_walk_condition
-                                ? "bg-red-500/20 text-red-300"
-                                : item.points > 0
-                                ? "bg-emerald-500/20 text-emerald-300"
-                                : "bg-amber-500/20 text-amber-300"
-                              : item.status === "error"
-                              ? "bg-amber-500/20 text-amber-300"
-                              : "bg-slate-800 text-slate-400"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="text-left sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-200/60 w-full sm:w-auto">
+            <div className="text-xs font-medium text-zinc-400">Score Rating</div>
+            <div className="text-3xl font-black text-zinc-900">
+              {totalScore > 0 ? `+${totalScore}` : totalScore}
+              <span className="text-sm font-normal text-zinc-400 ml-1">pts</span>
+            </div>
+            <div className="text-xs text-zinc-500 mt-0.5">
+              {completedCount} of {items.length} items checked
             </div>
           </div>
+        </div>
+
+        {/* Dealer Negotiation Talking Points */}
+        <div className="space-y-4 mb-8">
+          <h3 className="text-base font-bold text-zinc-900 tracking-tight flex items-center gap-2">
+            <span>Negotiation Talking Points & Repair Deductions</span>
+          </h3>
+
+          {report?.dealer_negotiation_script && report.dealer_negotiation_script.length > 0 ? (
+            <div className="space-y-3">
+              {report.dealer_negotiation_script.map((pt, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white border border-zinc-200/80 rounded-2xl p-4 shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-zinc-900">
+                      {pt.component} ({pt.finding})
+                    </span>
+                    <button
+                      onClick={() => handleCopy(pt.talking_point, idx)}
+                      className="text-xs text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition"
+                    >
+                      {copiedIndex === idx ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span className="text-emerald-600 font-medium">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs sm:text-sm text-zinc-600 italic leading-relaxed">
+                    "{pt.talking_point}"
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-zinc-400 py-4 bg-zinc-50 rounded-2xl text-center border border-zinc-100">
+              No defects or wear items recorded. Clean vehicle!
+            </div>
+          )}
+        </div>
+
+        {/* 20-Point Checklist Summary Breakdown */}
+        <div className="space-y-3">
+          <h3 className="text-base font-bold text-zinc-900 tracking-tight">
+            Item-by-Item Breakdown
+          </h3>
+          <div className="divide-y divide-zinc-100 border border-zinc-200/80 rounded-2xl overflow-hidden">
+            {items.map((it) => (
+              <div
+                key={it.id}
+                className="p-3.5 sm:px-4 flex items-center justify-between text-xs hover:bg-zinc-50 transition"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      it.is_walk_condition
+                        ? "bg-red-500"
+                        : it.status === "inspected" && it.points >= 0
+                        ? "bg-emerald-500"
+                        : it.status === "inspected" && it.points < 0
+                        ? "bg-amber-500"
+                        : "bg-zinc-300"
+                    }`}
+                  />
+                  <div className="truncate font-medium text-zinc-800">
+                    {it.title}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 ml-2">
+                  <span className="text-zinc-500">
+                    {it.finding_category || "Not inspected"}
+                  </span>
+                  <span
+                    className={`font-semibold ${
+                      it.is_walk_condition
+                        ? "text-red-600"
+                        : it.status === "inspected" && it.points < 0
+                        ? "text-amber-600"
+                        : it.status === "inspected" && it.points > 0
+                        ? "text-emerald-600"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    {it.is_walk_condition
+                      ? "WALK"
+                      : it.status !== "inspected"
+                      ? "—"
+                      : `${it.points > 0 ? "+" : ""}${it.points}`}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="mt-8 pt-5 border-t border-zinc-100 flex items-center justify-between print:hidden">
+          <button
+            onClick={() => {
+              if (confirm("Reset all inspection data?")) {
+                resetChecklist();
+                setReportModalOpen(false);
+              }
+            }}
+            className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1.5 transition"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Inspection</span>
+          </button>
+
+          <button
+            onClick={() => setReportModalOpen(false)}
+            className="h-11 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition"
+          >
+            Close Summary
+          </button>
         </div>
       </div>
     </div>
