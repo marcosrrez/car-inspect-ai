@@ -92,6 +92,34 @@ export interface VehicleProfile {
   mileage: number;
   asking_price: number;
   vin: string;
+  is_turbocharged?: boolean;
+}
+
+export interface ServiceRecord {
+  id: string;
+  task_id: string;
+  title: string;
+  date: string;
+  mileage: number;
+  cost_usd: number;
+  performed_by: "diy" | "professional";
+  parts_brand?: string;
+  notes?: string;
+}
+
+export interface MaintenanceTask {
+  id: string;
+  title: string;
+  category: "fluids" | "mechanical" | "preservation" | "detailing";
+  interval_miles: number;
+  interval_months: number;
+  is_diy_friendly: boolean;
+  diy_difficulty: "Easy" | "Moderate" | "Advanced" | "Professional Only";
+  why_it_matters: string;
+  oem_spec_note: string;
+  video_search_query: string;
+  pro_vs_diy_advice: string;
+  step_by_step_summary: string[];
 }
 
 export interface OverallReportSummary {

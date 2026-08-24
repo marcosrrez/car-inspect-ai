@@ -7,6 +7,7 @@ import {
   VisualInspectionResult,
   AudioInspectionResult,
   RubricOption,
+  ServiceRecord,
 } from "../types/inspection";
 
 const INITIAL_STATIONS: Station[] = [
@@ -425,7 +426,33 @@ const INITIAL_VEHICLE: VehicleProfile = {
   mileage: 115000,
   asking_price: 16500,
   vin: "4T3BK3BB0FU123456",
+  is_turbocharged: false,
 };
+
+const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [
+  {
+    id: "rec_1",
+    task_id: "engine_oil_filter",
+    title: "Full Synthetic Engine Oil & OEM Filter",
+    date: "2026-05-10",
+    mileage: 112000,
+    cost_usd: 48,
+    performed_by: "diy",
+    parts_brand: "Toyota Genuine 0W-20 & OEM Denso Filter",
+    notes: "New crush washer installed, torqued drain plug to 30 ft-lbs.",
+  },
+  {
+    id: "rec_2",
+    task_id: "brake_fluid_flush",
+    title: "Hydraulic Brake Fluid Flush & Bleed",
+    date: "2025-11-15",
+    mileage: 105000,
+    cost_usd: 120,
+    performed_by: "professional",
+    parts_brand: "Toyota Genuine DOT 3",
+    notes: "Flushed 4 calipers until fluid was clear.",
+  }
+];
 
 interface WalkAwayReason {
   componentName: string;
@@ -433,6 +460,10 @@ interface WalkAwayReason {
 }
 
 interface InspectionState {
+  // Navigation Mode
+  activeTab: "inspection" | "garage";
+  setActiveTab: (tab: "inspection" | "garage") => void;
+
   vehicle: VehicleProfile;
   stations: Station[];
   activeStationId: string;
@@ -445,6 +476,11 @@ interface InspectionState {
   walkAwayReason: WalkAwayReason | null;
   reportModalOpen: boolean;
   vehicleEditModalOpen: boolean;
+
+  // Service Logbook
+  serviceHistory: ServiceRecord[];
+  addServiceRecord: (record: Omit<ServiceRecord, "id">) => void;
+  deleteServiceRecord: (id: string) => void;
 
   // Actions
   updateVehicle: (patch: Partial<VehicleProfile>) => void;
@@ -490,6 +526,9 @@ interface InspectionState {
 export const useInspectionStore = create<InspectionState>()(
   persist(
     (set, get) => ({
+      activeTab: "inspection",
+      setActiveTab: (tab) => set({ activeTab: tab }),
+
       vehicle: INITIAL_VEHICLE,
       stations: INITIAL_STATIONS,
       activeStationId: "station_1",
@@ -501,6 +540,24 @@ export const useInspectionStore = create<InspectionState>()(
       walkAwayReason: null,
       reportModalOpen: false,
       vehicleEditModalOpen: false,
+
+      serviceHistory: INITIAL_SERVICE_RECORDS,
+
+      addServiceRecord: (record) => {
+        const newRecord: ServiceRecord = {
+          ...record,
+          id: `srv_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        };
+        set((state) => ({
+          serviceHistory: [newRecord, ...state.serviceHistory],
+        }));
+      },
+
+      deleteServiceRecord: (id) => {
+        set((state) => ({
+          serviceHistory: state.serviceHistory.filter((r) => r.id !== id),
+        }));
+      },
 
       updateVehicle: (patch) =>
         set((state) => ({ vehicle: { ...state.vehicle, ...patch } })),
@@ -757,7 +814,7 @@ export const useInspectionStore = create<InspectionState>()(
       },
     }),
     {
-      name: "car-inspect-store-v2",
+      name: "car-inspect-store-v3",
       storage: createJSONStorage(() => localStorage),
     }
   )

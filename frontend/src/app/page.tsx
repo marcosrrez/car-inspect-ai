@@ -5,6 +5,7 @@ import { Navbar } from "../components/Navbar";
 import { FloatingScorecard } from "../components/FloatingScorecard";
 import { StationNav } from "../components/StationNav";
 import { ChecklistCard } from "../components/ChecklistCard";
+import { GarageCareView } from "../components/GarageCareView";
 import { CameraCaptureModal } from "../components/CameraCaptureModal";
 import { AudioRecorderModal } from "../components/AudioRecorderModal";
 import { WalkAwayModal } from "../components/WalkAwayModal";
@@ -15,6 +16,7 @@ import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 export default function Home() {
   const {
+    activeTab,
     stations,
     activeStationId,
     setActiveStation,
@@ -61,61 +63,68 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 flex flex-col selection:bg-orange-500 selection:text-white pb-32">
-      {/* Quiet Top Header */}
+      {/* Top Header with Mode Switcher */}
       <Navbar />
 
-      {/* Main Inspection Workflow Container */}
-      <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6">
-        {/* Horizontal Segmented Station Selector & Title */}
-        <StationNav />
+      {/* Main Container */}
+      <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 pt-2">
+        {activeTab === "inspection" ? (
+          /* Mode 1: Pre-Purchase & 6-Month 20-Point Inspection */
+          <>
+            <StationNav />
 
-        {/* Focused Inspection Item Sections */}
-        <div className="divide-y divide-zinc-200/60">
-          {items.map((item, idx) => (
-            <ChecklistCard
-              key={item.id}
-              item={item}
-              itemIndex={idx}
-              totalItems={items.length}
-            />
-          ))}
-        </div>
+            {/* Focused Inspection Items */}
+            <div className="divide-y divide-zinc-200/60">
+              {items.map((item, idx) => (
+                <ChecklistCard
+                  key={item.id}
+                  item={item}
+                  itemIndex={idx}
+                  totalItems={items.length}
+                />
+              ))}
+            </div>
 
-        {/* Station Navigation Footer Buttons */}
-        <div className="mt-10 pt-4 flex items-center justify-between gap-3">
-          <button
-            onClick={handlePrevStation}
-            disabled={currentStationIndex === 0}
-            className={`px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition ${
-              currentStationIndex === 0
-                ? "opacity-25 cursor-not-allowed text-zinc-400"
-                : "text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-200/80 shadow-xs active:scale-95"
-            }`}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Previous Station</span>
-          </button>
+            {/* Station Step Navigation Footer */}
+            <div className="mt-10 pt-4 flex items-center justify-between gap-3">
+              <button
+                onClick={handlePrevStation}
+                disabled={currentStationIndex === 0}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                  currentStationIndex === 0
+                    ? "opacity-25 cursor-not-allowed text-zinc-400"
+                    : "text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-200/80 shadow-xs active:scale-95"
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Previous Station</span>
+              </button>
 
-          <button
-            onClick={handleNextStation}
-            className="px-5 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm active:scale-95 transition"
-          >
-            <span>
-              {isLastStation
-                ? "View Final Report"
-                : `Next: Station ${currentStationIndex + 2}`}
-            </span>
-            {isLastStation ? (
-              <FileText className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
-        </div>
+              <button
+                onClick={handleNextStation}
+                className="px-5 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm active:scale-95 transition"
+              >
+                <span>
+                  {isLastStation
+                    ? "View Final Report"
+                    : `Next: Station ${currentStationIndex + 2}`}
+                </span>
+                {isLastStation ? (
+                  <FileText className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </>
+        ) : (
+          /* Mode 2: The Car Care Nut Master Longevity & Service Logbook */
+          <GarageCareView />
+        )}
       </main>
 
-      {/* Floating Quiet Status Pill */}
-      <FloatingScorecard />
+      {/* Floating Status Pill (Active during Inspection mode) */}
+      {activeTab === "inspection" && <FloatingScorecard />}
 
       {/* Modals */}
       <CameraCaptureModal />
