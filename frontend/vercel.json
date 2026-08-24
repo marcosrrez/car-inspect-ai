@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://car-inspect-ai.onrender.com/api/v1/:path*"
+    }
+  ]
+}
