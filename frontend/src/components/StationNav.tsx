@@ -13,7 +13,7 @@ export const StationNav: React.FC = () => {
   const totalInStation = activeStation?.items.length || 0;
 
   return (
-    <div className="pt-4 pb-2">
+    <div className="pt-3 pb-2 mb-2">
       {/* Horizontal Segmented Navigation */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
         {stations.map((st) => {
@@ -30,7 +30,7 @@ export const StationNav: React.FC = () => {
               className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 flex items-center gap-1.5 ${
                 isActive
                   ? "bg-zinc-900 text-white shadow-sm"
-                  : "bg-zinc-200/60 hover:bg-zinc-200 text-zinc-600"
+                  : "bg-zinc-200/50 hover:bg-zinc-200/80 text-zinc-600"
               }`}
             >
               <span>
@@ -47,33 +47,14 @@ export const StationNav: React.FC = () => {
         })}
       </div>
 
-      {/* Calm Station Header & Progress */}
-      <div className="mt-4 mb-2 flex items-baseline justify-between">
-        <div>
-          <span className="text-[11px] font-semibold tracking-wider text-orange-600 uppercase">
-            Station {activeStation.number} of {stations.length}
-          </span>
-          <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">
-            {activeStation.title}
-          </h1>
-        </div>
-        <div className="text-xs text-zinc-400 font-medium shrink-0">
-          {completedInStation} of {totalInStation} items
-        </div>
-      </div>
-
-      {/* Hairline subtle progress line */}
-      <div className="w-full bg-zinc-200/80 h-1 rounded-full overflow-hidden mt-1 mb-4">
-        <div
-          className="bg-orange-500 h-full rounded-full transition-all duration-300 ease-out"
-          style={{
-            width: `${
-              totalInStation > 0
-                ? (completedInStation / totalInStation) * 100
-                : 0
-            }%`,
-          }}
-        />
+      {/* Clean, Deduplicated Station Heading */}
+      <div className="mt-4 flex items-baseline justify-between">
+        <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">
+          {activeStation.title}
+        </h1>
+        <span className="text-xs text-zinc-400 font-medium shrink-0 ml-3">
+          {completedInStation} of {totalInStation}
+        </span>
       </div>
     </div>
   );
