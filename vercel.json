@@ -1,10 +1,31 @@
 {
-  "framework": "nextjs",
-  "rootDirectory": "frontend",
+  "services": {
+    "frontend": {
+      "root": "frontend",
+      "framework": "nextjs"
+    },
+    "backend": {
+      "root": "backend"
+    }
+  },
   "rewrites": [
     {
-      "source": "/api/v1/:path*",
-      "destination": "https://car-inspect-ai.onrender.com/api/v1/:path*"
+      "source": "/api/backend(/.*)?",
+      "destination": {
+        "type": "service",
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/api/v1/(.*)",
+      "destination": "https://car-inspect-ai.onrender.com/api/v1/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "frontend"
+      }
     }
   ]
 }
