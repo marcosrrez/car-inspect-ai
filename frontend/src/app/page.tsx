@@ -11,6 +11,7 @@ import { AudioRecorderModal } from "../components/AudioRecorderModal";
 import { WalkAwayModal } from "../components/WalkAwayModal";
 import { VehicleEditModal } from "../components/VehicleEditModal";
 import { InspectionReportModal } from "../components/InspectionReportModal";
+import { ObdDecoderModal } from "../components/ObdDecoderModal";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
@@ -21,6 +22,8 @@ export default function Home() {
     activeStationId,
     setActiveStation,
     setReportModalOpen,
+    obdModalOpen,
+    setObdModalOpen,
   } = useInspectionStore();
 
   const [isClient, setIsClient] = useState(false);
@@ -63,7 +66,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 flex flex-col selection:bg-orange-500 selection:text-white pb-32">
-      {/* Top Header with Mode Switcher */}
+      {/* Top Header with Multi-Vehicle Dropdown & Mode Switcher */}
       <Navbar />
 
       {/* Main Container */}
@@ -132,6 +135,10 @@ export default function Home() {
       <WalkAwayModal />
       <VehicleEditModal />
       <InspectionReportModal />
+      <ObdDecoderModal
+        isOpen={obdModalOpen}
+        onClose={() => setObdModalOpen(false)}
+      />
     </div>
   );
 }

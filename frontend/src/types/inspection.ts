@@ -103,6 +103,7 @@ export interface Station {
 }
 
 export interface VehicleProfile {
+  id: string;
   year: number;
   make: string;
   model: string;
@@ -138,6 +139,19 @@ export interface MaintenanceTask {
   video_search_query: string;
   pro_vs_diy_advice: string;
   step_by_step_summary: string[];
+}
+
+export interface ObdDtcFault {
+  code: string;
+  system: "Powertrain" | "Transmission" | "Emissions" | "Electrical" | "Safety";
+  title: string;
+  severity: "Minor" | "Moderate" | "Severe" | "Fatal Deal-Breaker";
+  points_deduction: number;
+  is_walk: boolean;
+  estimated_repair_cost: number;
+  symptoms: string;
+  explanation: string;
+  dealer_script: string;
 }
 
 export interface OverallReportSummary {

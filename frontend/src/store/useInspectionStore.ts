@@ -418,16 +418,41 @@ const INITIAL_STATIONS: Station[] = [
   },
 ];
 
-const INITIAL_VEHICLE: VehicleProfile = {
-  year: 2015,
-  make: "Toyota",
-  model: "Highlander",
-  trim: "V6 Limited AWD",
-  mileage: 115000,
-  asking_price: 16500,
-  vin: "4T3BK3BB0FU123456",
-  is_turbocharged: false,
-};
+const INITIAL_GARAGE: VehicleProfile[] = [
+  {
+    id: "veh_highlander_2015",
+    year: 2015,
+    make: "Toyota",
+    model: "Highlander",
+    trim: "V6 Limited AWD",
+    mileage: 115000,
+    asking_price: 16500,
+    vin: "4T3BK3BB0FU123456",
+    is_turbocharged: false,
+  },
+  {
+    id: "veh_lexus_rx350_2018",
+    year: 2018,
+    make: "Lexus",
+    model: "RX 350",
+    trim: "F-Sport AWD",
+    mileage: 68000,
+    asking_price: 28500,
+    vin: "2T2HZMCA5KC789012",
+    is_turbocharged: false,
+  },
+  {
+    id: "veh_rav4_hybrid_2021",
+    year: 2021,
+    make: "Toyota",
+    model: "RAV4",
+    trim: "XSE Hybrid AWD",
+    mileage: 42000,
+    asking_price: 31000,
+    vin: "4T3BWRFV5MU345678",
+    is_turbocharged: false,
+  }
+];
 
 const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [
   {
@@ -460,11 +485,16 @@ interface WalkAwayReason {
 }
 
 interface InspectionState {
-  // Navigation Mode
   activeTab: "inspection" | "garage";
   setActiveTab: (tab: "inspection" | "garage") => void;
 
+  // Multi-Vehicle Garage
+  garageVehicles: VehicleProfile[];
+  activeVehicleId: string;
   vehicle: VehicleProfile;
+  switchActiveVehicle: (id: string) => void;
+  addVehicleToGarage: (v: Omit<VehicleProfile, "id">) => void;
+
   stations: Station[];
   activeStationId: string;
   
@@ -476,6 +506,7 @@ interface InspectionState {
   walkAwayReason: WalkAwayReason | null;
   reportModalOpen: boolean;
   vehicleEditModalOpen: boolean;
+  obdModalOpen: boolean;
 
   // Service Logbook
   serviceHistory: ServiceRecord[];
@@ -493,6 +524,7 @@ interface InspectionState {
   closeWalkAwayModal: () => void;
   setReportModalOpen: (open: boolean) => void;
   setVehicleEditModalOpen: (open: boolean) => void;
+  setObdModalOpen: (open: boolean) => void;
 
   // Result Mutators
   updateItemResult: (
@@ -529,7 +561,36 @@ export const useInspectionStore = create<InspectionState>()(
       activeTab: "inspection",
       setActiveTab: (tab) => set({ activeTab: tab }),
 
-      vehicle: INITIAL_VEHICLE,
+      garageVehicles: INITIAL_GARAGE,
+      activeVehicleId: INITIAL_GARAGE[0].id,
+      vehicle: INITIAL_GARAGE[0],
+
+      switchActiveVehicle: (id) => {
+        const found = get().garageVehicles.find((v) => v.id === id);
+        if (found) {
+          set({
+            activeVehicleId: found.id,
+            vehicle: found,
+            stations: INITIAL_STATIONS,
+            activeStationId: "station_1",
+          });
+        }
+      },
+
+      addVehicleToGarage: (vehData) => {
+        const newVehicle: VehicleProfile = {
+          ...vehData,
+          id: `veh_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        };
+        set((state) => ({
+          garageVehicles: [newVehicle, ...state.garageVehicles],
+          activeVehicleId: newVehicle.id,
+          vehicle: newVehicle,
+          stations: INITIAL_STATIONS,
+          activeStationId: "station_1",
+        }));
+      },
+
       stations: INITIAL_STATIONS,
       activeStationId: "station_1",
       
@@ -540,6 +601,7 @@ export const useInspectionStore = create<InspectionState>()(
       walkAwayReason: null,
       reportModalOpen: false,
       vehicleEditModalOpen: false,
+      obdModalOpen: false,
 
       serviceHistory: INITIAL_SERVICE_RECORDS,
 
@@ -560,7 +622,15 @@ export const useInspectionStore = create<InspectionState>()(
       },
 
       updateVehicle: (patch) =>
-        set((state) => ({ vehicle: { ...state.vehicle, ...patch } })),
+        set((state) => {
+          const updated = { ...state.vehicle, ...patch };
+          return {
+            vehicle: updated,
+            garageVehicles: state.garageVehicles.map((v) =>
+              v.id === updated.id ? updated : v
+            ),
+          };
+        }),
 
       setActiveStation: (stationId) => set({ activeStationId: stationId }),
 
@@ -584,6 +654,7 @@ export const useInspectionStore = create<InspectionState>()(
 
       setReportModalOpen: (open) => set({ reportModalOpen: open }),
       setVehicleEditModalOpen: (open) => set({ vehicleEditModalOpen: open }),
+      setObdModalOpen: (open) => set({ obdModalOpen: open }),
 
       updateItemResult: (itemId, data) => {
         set((state) => ({
@@ -814,7 +885,7 @@ export const useInspectionStore = create<InspectionState>()(
       },
     }),
     {
-      name: "car-inspect-store-v3",
+      name: "car-inspect-store-v4",
       storage: createJSONStorage(() => localStorage),
     }
   )
