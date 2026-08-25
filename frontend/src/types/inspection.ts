@@ -154,6 +154,42 @@ export interface ObdDtcFault {
   dealer_script: string;
 }
 
+export interface DealNote {
+  id: string;
+  timestamp: string;
+  author: "buyer" | "seller" | "mechanic";
+  text: string;
+}
+
+export interface SavedInspectionSnapshot {
+  id: string;
+  savedAt: string;
+  vehicle: VehicleProfile;
+  total_score: number;
+  verdict: "EXCELLENT BUY" | "FAIR / NEGOTIATE" | "MAJOR RISK" | "WALK AWAY - DEAL BREAKER";
+  has_fatal_walk: boolean;
+  total_estimated_repairs_usd: number;
+  recommended_offer_usd: number;
+  completed_count: number;
+  total_items: number;
+  items_summary: {
+    id: string;
+    title: string;
+    finding_category: string;
+    points: number;
+    is_walk: boolean;
+    explanation?: string;
+    negotiation_tip?: string | null;
+  }[];
+  deal_notes: DealNote[];
+  seller_info: {
+    seller_name: string;
+    dealership_or_location: string;
+    phone: string;
+    listing_url: string;
+  };
+}
+
 export interface OverallReportSummary {
   total_score: number;
   max_possible_score: number;

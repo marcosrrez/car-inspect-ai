@@ -6,6 +6,7 @@ import { FloatingScorecard } from "../components/FloatingScorecard";
 import { StationNav } from "../components/StationNav";
 import { ChecklistCard } from "../components/ChecklistCard";
 import { GarageCareView } from "../components/GarageCareView";
+import { CarHuntArchiveView } from "../components/CarHuntArchiveView";
 import { CameraCaptureModal } from "../components/CameraCaptureModal";
 import { AudioRecorderModal } from "../components/AudioRecorderModal";
 import { WalkAwayModal } from "../components/WalkAwayModal";
@@ -66,7 +67,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-zinc-900 flex flex-col selection:bg-orange-500 selection:text-white pb-32">
-      {/* Top Header with Multi-Vehicle Dropdown & Mode Switcher */}
+      {/* Top Header with Multi-Vehicle Dropdown & 3-Mode Switcher */}
       <Navbar />
 
       {/* Main Container */}
@@ -120,8 +121,11 @@ export default function Home() {
               </button>
             </div>
           </>
+        ) : activeTab === "hunt" ? (
+          /* Mode 2: Car Hunt Archive, Negotiation Log & Side-by-Side Comparison */
+          <CarHuntArchiveView />
         ) : (
-          /* Mode 2: The Car Care Nut Master Longevity & Service Logbook */
+          /* Mode 3: The Car Care Nut Master Longevity & Service Logbook */
           <GarageCareView />
         )}
       </main>

@@ -8,6 +8,8 @@ import {
   AudioInspectionResult,
   RubricOption,
   ServiceRecord,
+  SavedInspectionSnapshot,
+  DealNote,
 } from "../types/inspection";
 
 const INITIAL_STATIONS: Station[] = [
@@ -465,6 +467,116 @@ const INITIAL_GARAGE: VehicleProfile[] = [
   }
 ];
 
+const INITIAL_HUNT_SNAPSHOTS: SavedInspectionSnapshot[] = [
+  {
+    id: "snap_highlander_dealer1",
+    savedAt: "2026-08-20T14:30:00Z",
+    vehicle: {
+      id: "veh_highlander_2015",
+      year: 2015,
+      make: "Toyota",
+      model: "Highlander",
+      trim: "V6 Limited AWD",
+      mileage: 115000,
+      asking_price: 16500,
+      vin: "4T3BK3BB0FU123456",
+      is_turbocharged: false,
+    },
+    total_score: -4,
+    verdict: "FAIR / NEGOTIATE",
+    has_fatal_walk: false,
+    total_estimated_repairs_usd: 2450,
+    recommended_offer_usd: 14050,
+    completed_count: 20,
+    total_items: 20,
+    items_summary: [
+      {
+        id: "s2_timing_cover",
+        title: "Front Engine Timing Cover Seam",
+        finding_category: "Wet, grimy",
+        points: -5,
+        is_walk: false,
+        explanation: "Active oil seepage along timing cover perimeter seam.",
+        negotiation_tip: "Require $1,800 discount for timing cover reseal.",
+      },
+      {
+        id: "s4_tire_tread",
+        title: "Tire Tread Depth & Wear Pattern",
+        finding_category: "Inner / outer shoulder bald",
+        points: -3,
+        is_walk: false,
+        explanation: "Front tires worn bald at inner shoulder from camber alignment issue.",
+        negotiation_tip: "Deduct $650 for two new front tires and 4-wheel alignment.",
+      }
+    ],
+    deal_notes: [
+      {
+        id: "note_1",
+        timestamp: "2026-08-20T15:00:00Z",
+        author: "buyer",
+        text: "Salesman Mike offered $15,500. Showed him the timing cover photo and tire wear, pushed for $14,200.",
+      },
+      {
+        id: "note_2",
+        timestamp: "2026-08-21T10:15:00Z",
+        author: "seller",
+        text: "Dealer called back agreeing to put 2 new front tires on if I take $15,000. Countering at $14,500.",
+      }
+    ],
+    seller_info: {
+      seller_name: "Mike Sullivan (Sales Mgr)",
+      dealership_or_location: "Metro Toyota Used Lot, 1200 Auto Mall Blvd",
+      phone: "(555) 234-8901",
+      listing_url: "https://www.autotrader.com",
+    }
+  },
+  {
+    id: "snap_odyssey_craigslist",
+    savedAt: "2026-08-22T11:00:00Z",
+    vehicle: {
+      id: "veh_odyssey_2016",
+      year: 2016,
+      make: "Honda",
+      model: "Odyssey",
+      trim: "EX-L",
+      mileage: 104000,
+      asking_price: 15800,
+      vin: "5FNRL5H64GB123456",
+      is_turbocharged: false,
+    },
+    total_score: 18,
+    verdict: "EXCELLENT BUY",
+    has_fatal_walk: false,
+    total_estimated_repairs_usd: 1200,
+    recommended_offer_usd: 14600,
+    completed_count: 20,
+    total_items: 20,
+    items_summary: [
+      {
+        id: "s1_oil_cap",
+        title: "Oil Filler Cap Underside",
+        finding_category: "Clean, amber / dry",
+        points: 2,
+        is_walk: false,
+      }
+    ],
+    deal_notes: [
+      {
+        id: "note_3",
+        timestamp: "2026-08-22T11:45:00Z",
+        author: "buyer",
+        text: "Private seller John. Clean Carfax, 1-owner. Timing belt is due at 105k miles ($1,200). Offering $14,600 cash.",
+      }
+    ],
+    seller_info: {
+      seller_name: "John Miller (Private Seller)",
+      dealership_or_location: "South Suburbs, Meet at Chase Bank",
+      phone: "(555) 876-5432",
+      listing_url: "https://craigslist.org",
+    }
+  }
+];
+
 const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [
   {
     id: "rec_1",
@@ -496,8 +608,8 @@ interface WalkAwayReason {
 }
 
 interface InspectionState {
-  activeTab: "inspection" | "garage";
-  setActiveTab: (tab: "inspection" | "garage") => void;
+  activeTab: "inspection" | "garage" | "hunt";
+  setActiveTab: (tab: "inspection" | "garage" | "hunt") => void;
 
   // Multi-Vehicle Garage
   garageVehicles: VehicleProfile[];
@@ -523,6 +635,17 @@ interface InspectionState {
   serviceHistory: ServiceRecord[];
   addServiceRecord: (record: Omit<ServiceRecord, "id">) => void;
   deleteServiceRecord: (id: string) => void;
+
+  // Car Hunt Archive & Snapshots
+  savedHuntSnapshots: SavedInspectionSnapshot[];
+  saveCurrentInspectionSnapshot: (sellerInfo?: {
+    seller_name?: string;
+    dealership_or_location?: string;
+    phone?: string;
+    listing_url?: string;
+  }) => string;
+  addDealNoteToSnapshot: (snapshotId: string, text: string, author?: "buyer" | "seller" | "mechanic") => void;
+  deleteSnapshot: (snapshotId: string) => void;
 
   // Actions
   updateVehicle: (patch: Partial<VehicleProfile>) => void;
@@ -615,6 +738,95 @@ export const useInspectionStore = create<InspectionState>()(
       obdModalOpen: false,
 
       serviceHistory: INITIAL_SERVICE_RECORDS,
+      savedHuntSnapshots: INITIAL_HUNT_SNAPSHOTS,
+
+      saveCurrentInspectionSnapshot: (sellerInfo) => {
+        const items = get().getAllItems();
+        const score = get().getTotalPoints();
+        const hasFatal = get().hasWalkAwayCondition();
+        const completed = get().getCompletedCount();
+        const vehicle = get().vehicle;
+
+        const deductions = items
+          .filter((it) => it.status === "inspected" && it.points < 0)
+          .reduce((sum, it) => sum + Math.abs(it.points) * 200, 0);
+
+        const snapshot: SavedInspectionSnapshot = {
+          id: `snap_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          savedAt: new Date().toISOString(),
+          vehicle: { ...vehicle },
+          total_score: score,
+          verdict: hasFatal
+            ? "WALK AWAY - DEAL BREAKER"
+            : score >= 20
+            ? "EXCELLENT BUY"
+            : "FAIR / NEGOTIATE",
+          has_fatal_walk: hasFatal,
+          total_estimated_repairs_usd: deductions,
+          recommended_offer_usd: Math.max(0, vehicle.asking_price - deductions),
+          completed_count: completed,
+          total_items: items.length,
+          items_summary: items
+            .filter((it) => it.status === "inspected")
+            .map((it) => ({
+              id: it.id,
+              title: it.title,
+              finding_category: it.finding_category || "Standard",
+              points: it.points,
+              is_walk: it.is_walk_condition,
+              explanation: it.explanation,
+              negotiation_tip: it.negotiation_tip,
+            })),
+          deal_notes: [
+            {
+              id: `note_${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              author: "buyer",
+              text: `Completed 20-point PPI. Score: ${score > 0 ? `+${score}` : score} pts. Estimated repair deduction: -$${deductions.toLocaleString()}.`,
+            }
+          ],
+          seller_info: {
+            seller_name: sellerInfo?.seller_name || "Dealership / Private Seller",
+            dealership_or_location: sellerInfo?.dealership_or_location || "Local Car Lot",
+            phone: sellerInfo?.phone || "",
+            listing_url: sellerInfo?.listing_url || "",
+          },
+        };
+
+        set((state) => ({
+          savedHuntSnapshots: [snapshot, ...state.savedHuntSnapshots],
+        }));
+
+        return snapshot.id;
+      },
+
+      addDealNoteToSnapshot: (snapshotId, text, author = "buyer") => {
+        set((state) => ({
+          savedHuntSnapshots: state.savedHuntSnapshots.map((s) => {
+            if (s.id === snapshotId) {
+              return {
+                ...s,
+                deal_notes: [
+                  ...s.deal_notes,
+                  {
+                    id: `note_${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    author,
+                    text,
+                  }
+                ],
+              };
+            }
+            return s;
+          }),
+        }));
+      },
+
+      deleteSnapshot: (snapshotId) => {
+        set((state) => ({
+          savedHuntSnapshots: state.savedHuntSnapshots.filter((s) => s.id !== snapshotId),
+        }));
+      },
 
       addServiceRecord: (record) => {
         const newRecord: ServiceRecord = {
@@ -896,7 +1108,7 @@ export const useInspectionStore = create<InspectionState>()(
       },
     }),
     {
-      name: "car-inspect-store-v4",
+      name: "car-inspect-store-v5",
       storage: createJSONStorage(() => localStorage),
     }
   )

@@ -14,6 +14,8 @@ import {
   Cpu,
   ChevronDown,
   Plus,
+  Bookmark,
+  Scale,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
 
@@ -31,6 +33,7 @@ export const Navbar: React.FC = () => {
     loadDemoScenario,
     getCompletedCount,
     getAllItems,
+    savedHuntSnapshots,
   } = useInspectionStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,7 +84,7 @@ export const Navbar: React.FC = () => {
               <Car className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex items-center gap-1">
-              <span className="font-semibold text-xs sm:text-sm text-zinc-900 truncate max-w-[130px] sm:max-w-[170px]">
+              <span className="font-semibold text-xs sm:text-sm text-zinc-900 truncate max-w-[110px] sm:max-w-[150px]">
                 {vehicle.year} {vehicle.make} {vehicle.model}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-700 transition" />
@@ -135,21 +138,39 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        {/* Mode Switcher: [ Inspection ] ↔ [ Garage Care ] */}
-        <div className="bg-zinc-100 p-0.5 rounded-full flex items-center shrink-0 border border-zinc-200/50">
+        {/* 3-Mode Switcher: [ Inspect ] ↔ [ 🎯 Hunt ] ↔ [ Care Log ] */}
+        <div className="bg-zinc-100 p-0.5 rounded-full flex items-center shrink-0 border border-zinc-200/50 text-xs font-semibold">
           <button
             onClick={() => setActiveTab("inspection")}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition ${
               activeTab === "inspection"
                 ? "bg-white text-zinc-900 shadow-xs"
                 : "text-zinc-500 hover:text-zinc-800"
             }`}
           >
-            Inspection
+            Inspect
           </button>
+
+          <button
+            onClick={() => setActiveTab("hunt")}
+            className={`px-2 sm:px-2.5 py-1 rounded-full transition flex items-center gap-1 ${
+              activeTab === "hunt"
+                ? "bg-white text-zinc-900 shadow-xs"
+                : "text-zinc-500 hover:text-zinc-800"
+            }`}
+          >
+            <Bookmark className="w-3 h-3 text-orange-500" />
+            <span>Hunt</span>
+            {savedHuntSnapshots.length > 0 && (
+              <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.2 rounded-full font-bold">
+                {savedHuntSnapshots.length}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveTab("garage")}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 ${
+            className={`px-2.5 sm:px-3 py-1 rounded-full transition flex items-center gap-1 ${
               activeTab === "garage"
                 ? "bg-white text-zinc-900 shadow-xs"
                 : "text-zinc-500 hover:text-zinc-800"
@@ -178,7 +199,7 @@ export const Navbar: React.FC = () => {
             <div className="absolute right-0 mt-2 w-64 bg-white border border-zinc-200/80 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-3 py-2 border-b border-zinc-100 flex items-center justify-between">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Vehicle Tools
+                  Tools & Scans
                 </span>
                 <span
                   className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
