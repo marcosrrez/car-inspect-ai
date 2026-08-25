@@ -53,6 +53,24 @@ export interface RubricOption {
   negotiation_tip?: string | null;
 }
 
+export interface VisualReferenceExample {
+  type: "good" | "concern" | "critical";
+  title: string;
+  visual_cue: string;
+  points: number;
+  is_walk?: boolean;
+  sample_image_url?: string;
+  negotiation_script?: string;
+}
+
+export interface ComponentReferenceSet {
+  itemId: string;
+  component_name: string;
+  bay_location_guide: string;
+  what_to_look_for: string;
+  references: VisualReferenceExample[];
+}
+
 export interface ChecklistItem {
   id: string;
   station_id: string;
