@@ -191,6 +191,48 @@ export const CAR_CARE_NUT_MAINTENANCE_TASKS: MaintenanceTask[] = [
     ]
   },
   {
+    id: "honda_timing_belt_water_pump",
+    title: "Honda J35 Timing Belt, Water Pump & Hydraulic Tensioner",
+    category: "mechanical",
+    interval_miles: 105000,
+    interval_months: 84,
+    is_diy_friendly: false,
+    diy_difficulty: "Advanced",
+    why_it_matters:
+      "CRITICAL: The Honda Odyssey 3.5L J35 is an interference engine. If the rubber timing belt snaps or the hydraulic tensioner leaks, valves will smash into pistons, causing catastrophic engine destruction ($5,000+). Replace every 105,000 miles or 7 years without fail.",
+    oem_spec_note: "OEM Aisin Timing Belt Kit (TKH-002) with Mitsuboshi belt, Koyo idler pulleys, and Aisin water pump.",
+    video_search_query: "honda odyssey 3.5 j35 timing belt water pump replacement aisin",
+    pro_vs_diy_advice: "Advanced DIY / Professional Recommended. Requires 19mm heavy-duty harmonic balancer socket, cam holding tool, and precise crankshaft TDC alignment.",
+    step_by_step_summary: [
+      "Remove front passenger wheel, splash shield, and engine mount bracket.",
+      "Use high-mass 19mm socket and impact wrench to break free tight crankshaft pulley bolt.",
+      "Align crankshaft and both camshaft sprockets to exact Top Dead Center (TDC) timing marks.",
+      "Remove old hydraulic tensioner, water pump, and idler pulleys.",
+      "Install new Aisin water pump with fresh gasket, bolt in new pulleys, route Mitsuboshi timing belt matching factory marks, and pull tensioner grenade pin."
+    ]
+  },
+  {
+    id: "honda_atf_dw1",
+    title: "Honda DW-1 ATF Transmission Fluid (Drain & Fill)",
+    category: "fluids",
+    interval_miles: 30000,
+    interval_months: 36,
+    is_diy_friendly: true,
+    diy_difficulty: "Easy",
+    why_it_matters:
+      "Honda automatic transmissions rely on unique friction modifiers in Genuine Honda ATF DW-1. Changing fluid every 30,000 miles (drain and fill ~3.5 quarts) prevents torque converter judder, harsh 2-3 shifting, and clutch plate wear.",
+    oem_spec_note: "Genuine Honda ATF DW-1 only. Never use generic multi-vehicle fluid.",
+    video_search_query: "honda odyssey transmission fluid change drain and fill dw1",
+    pro_vs_diy_advice: "Easy DIY. Use a 3/8\" ratchet drive directly into the drain plug square hole. Clean magnetic drain plug and refill 3.3 quarts through upper fill hole.",
+    step_by_step_summary: [
+      "Warm transmission by driving 5 minutes, then park on level ground.",
+      "Insert 3/8\" ratchet square head into bottom transmission drain bolt and drain ~3.3 quarts.",
+      "Wipe clean fine metal paste from magnetic drain plug, install new 18mm aluminum crush washer, and torque to 36 ft-lbs.",
+      "Remove upper transmission fill plug (17mm bolt) or dipstick tube.",
+      "Use long transmission funnel to refill exactly 3.3–3.5 quarts of Genuine Honda ATF DW-1."
+    ]
+  },
+  {
     id: "weatherstrip_interior_preservation",
     title: "Rubber Weatherstrip & Interior UV Preservation",
     category: "detailing",

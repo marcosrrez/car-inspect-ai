@@ -420,6 +420,17 @@ const INITIAL_STATIONS: Station[] = [
 
 const INITIAL_GARAGE: VehicleProfile[] = [
   {
+    id: "veh_odyssey_2016",
+    year: 2016,
+    make: "Honda",
+    model: "Odyssey",
+    trim: "EX-L",
+    mileage: 104000,
+    asking_price: 15800,
+    vin: "5FNRL5H64GB123456",
+    is_turbocharged: false,
+  },
+  {
     id: "veh_highlander_2015",
     year: 2015,
     make: "Toyota",
