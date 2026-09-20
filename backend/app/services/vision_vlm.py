@@ -458,19 +458,11 @@ CHECKLIST_RUBRICS: Dict[str, Dict[str, Any]] = {
 
 class VisionLanguageModelService:
     def __init__(self):
-        # Auto-load from environment or local api_keys
+        # API keys are read from the environment only. When ANTHROPIC_API_KEY is
+        # unset, the service falls back to the embedded heuristic CV engine.
         self.anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
         self.openai_key = os.environ.get("OPENAI_API_KEY")
         self.gemini_key = os.environ.get("GEMINI_API_KEY")
-
-        if not self.anthropic_key and os.path.exists("/Users/florecer/.api_keys"):
-            try:
-                with open("/Users/florecer/.api_keys", "r") as f:
-                    for line in f:
-                        if line.startswith("ANTHROPIC_API_KEY="):
-                            self.anthropic_key = line.strip().split("=", 1)[1]
-            except Exception:
-                pass
 
     def _assess_image_quality(self, img: Image.Image) -> Dict[str, Any]:
         img_gray = img.convert('L')
@@ -585,8 +577,7 @@ Return ONLY valid JSON matching this exact structure:
         self,
         image_bytes: bytes,
         component_key: str,
-        car_context: str = "2015 Toyota Highlander V6",
-        preset_condition: Optional[str] = None
+        car_context: str = "vehicle"
     ) -> VisualInspectionResult:
         rubric_data = CHECKLIST_RUBRICS.get(component_key)
         if not rubric_data:
@@ -602,27 +593,13 @@ Return ONLY valid JSON matching this exact structure:
         comp_name = rubric_data["component"]
         options = rubric_data["options"]
 
-        # 1. Check if preset condition is requested (for 1-click test evaluations)
-        if preset_condition and preset_condition in options:
-            opt = options[preset_condition]
-            return VisualInspectionResult(
-                component_analyzed=comp_name,
-                finding_category=preset_condition,
-                points=opt["points"],
-                is_walk_condition=opt["is_walk"],
-                explanation=opt["explanation"],
-                negotiation_tip=opt["negotiation_tip"],
-                confidence=0.98,
-                suggested_action="Score recorded."
-            )
-
-        # 2. Try Live Multimodal Vision LLM (Claude 3.5 Sonnet) if API Key is available
-        if self.anthropic_key and not preset_condition:
+        # 1. Try Live Multimodal Vision LLM (Claude) if an API key is configured.
+        if self.anthropic_key:
             llm_result = self._call_anthropic_vision(image_bytes, comp_name, options, car_context)
             if llm_result:
                 return llm_result
 
-        # 3. Embedded Automotive Computer-Vision & Quality Engine Fallback
+        # 2. Embedded Automotive Computer-Vision & Quality Engine Fallback
         try:
             pil_img = Image.open(io.BytesIO(image_bytes))
             quality = self._assess_image_quality(pil_img)
@@ -638,7 +615,7 @@ Return ONLY valid JSON matching this exact structure:
             )
 
         # "I Can't See That" / Obscured / Blurry photo fallback
-        if quality["is_obscured"] and not preset_condition:
+        if quality["is_obscured"]:
             reason = "too blurry" if quality["is_blurry"] else ("too dark" if quality["is_too_dark"] else "overexposed")
             return VisualInspectionResult(
                 component_analyzed=comp_name,

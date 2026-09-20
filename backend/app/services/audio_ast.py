@@ -280,14 +280,11 @@ class AudioSpectrogramTransformerService:
         
         return mel_spec_norm, summary, metrics
 
-    def diagnose_audio(self, audio_bytes: bytes, context_hint: str = "idling", preset_fault: Optional[str] = None) -> AudioInspectionResult:
+    def diagnose_audio(self, audio_bytes: bytes, context_hint: str = "idling") -> AudioInspectionResult:
         waveform = self.load_audio_from_bytes(audio_bytes)
         mel_norm, spec_summary, metrics = self.compute_mel_spectrogram(waveform)
-        
-        if preset_fault and preset_fault in ACOUSTIC_CLASSES:
-            primary_name = preset_fault
-        else:
-            primary_name = self._classify_acoustics(waveform, spec_summary, metrics, context_hint)
+
+        primary_name = self._classify_acoustics(waveform, spec_summary, metrics, context_hint)
 
         primary_meta = ACOUSTIC_CLASSES[primary_name]
         top_candidates = self._build_top_candidates(primary_name, spec_summary)

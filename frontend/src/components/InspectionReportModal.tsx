@@ -50,6 +50,7 @@ export const InspectionReportModal: React.FC = () => {
   }, [reportModalOpen]);
 
   const fetchReport = async () => {
+    if (!vehicle) return;
     setLoading(true);
     try {
       const summary = await generateOverallReport(items, vehicle);
@@ -68,6 +69,7 @@ export const InspectionReportModal: React.FC = () => {
   };
 
   const handleCopyFullDossier = () => {
+    if (!vehicle) return;
     const lines = [
       `CARINSPECT AI — CERTIFIED PRE-PURCHASE INSPECTION DOSSIER`,
       `Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""}`,
@@ -96,7 +98,7 @@ export const InspectionReportModal: React.FC = () => {
     setTimeout(() => setCopiedAll(false), 2500);
   };
 
-  if (!reportModalOpen) return null;
+  if (!reportModalOpen || !vehicle) return null;
 
   const totalDeductions = report?.total_estimated_repairs_usd || 0;
   const targetOffer = Math.max(0, vehicle.asking_price - totalDeductions);
@@ -127,7 +129,7 @@ export const InspectionReportModal: React.FC = () => {
                 <span>•</span>
                 <span>{(vehicle.mileage || 0).toLocaleString()} miles</span>
                 <span>•</span>
-                <span>VIN: {vehicle.vin || "4T3BK3BB0FU123456"}</span>
+                <span>VIN: {vehicle.vin || "Not provided"}</span>
               </div>
             </div>
           </div>

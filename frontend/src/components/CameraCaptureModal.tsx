@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { compressImage } from "../utils/imageCompression";
-import { diagnoseVision, fetchSampleImageBlob } from "../utils/apiClient";
+import { diagnoseVision } from "../utils/apiClient";
 import { VISUAL_KNOWLEDGE_BASE } from "../utils/visualKnowledgeBase";
 import { DiagnosticConfirmationModal } from "./DiagnosticConfirmationModal";
 
@@ -172,7 +172,9 @@ export const CameraCaptureModal: React.FC = () => {
       const compressedBlob = compRes.file;
       const previewUrl = compRes.previewUrl;
 
-      const carContext = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""}`;
+      const carContext = vehicle
+        ? `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""}`.trim()
+        : "vehicle";
       const diagResult = await diagnoseVision(compressedBlob, item.id, carContext);
 
       if (diagResult.finding_category === "Error") {
@@ -204,42 +206,6 @@ export const CameraCaptureModal: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Diagnostic failed. Please check network and retry.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRunSamplePreset = async (presetId: string, label: string) => {
-    if (!item) return;
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const sampleBlob = await fetchSampleImageBlob(presetId);
-      const compRes = await compressImage(sampleBlob, 1920, 1920, 0.85);
-      const previewUrl = compRes.previewUrl;
-
-      const carContext = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-      const diagResult = await diagnoseVision(sampleBlob, item.id, carContext, label);
-
-      const matchedRef = refSet?.references.find((r) =>
-        r.title.toLowerCase().includes(label.toLowerCase())
-      );
-
-      setPendingDiagnostic({
-        itemId: item.id,
-        finding_category: diagResult.finding_category,
-        points: diagResult.points,
-        is_walk_condition: diagResult.is_walk_condition,
-        explanation: diagResult.explanation,
-        negotiation_tip: diagResult.negotiation_tip,
-        confidence: diagResult.confidence,
-        previewUrl,
-        matchedReferenceTitle: matchedRef?.title,
-        matchedReferenceCue: matchedRef?.visual_cue,
-      });
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Failed to load sample evaluation.");
     } finally {
       setLoading(false);
     }
@@ -487,40 +453,11 @@ export const CameraCaptureModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Benchmark Test Presets */}
-              <div className="pt-2 border-t border-zinc-100">
-                <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
-                  Or test with calibrated benchmark images:
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {item.rubric_summary.map((opt) => (
-                    <button
-                      key={opt.label}
-                      disabled={loading}
-                      onClick={() =>
-                        handleRunSamplePreset(
-                          opt.is_walk ? "dipstick_milkshake" : "dipstick_clean",
-                          opt.label
-                        )
-                      }
-                      className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-left border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 transition flex items-center justify-between"
-                    >
-                      <span className="truncate mr-1 text-[11px]">{opt.label}</span>
-                      <span
-                        className={`text-[10px] font-bold shrink-0 ${
-                          opt.is_walk
-                            ? "text-red-600"
-                            : opt.points < 0
-                            ? "text-amber-600"
-                            : "text-emerald-600"
-                        }`}
-                      >
-                        {opt.is_walk ? "Walk" : `${opt.points > 0 ? "+" : ""}${opt.points}`}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Manual fallback hint */}
+              <p className="text-[11px] text-zinc-400 text-center leading-relaxed pt-1">
+                You can also close this and tap the condition that matches directly
+                from the checklist.
+              </p>
             </div>
           ) : (
             /* TAB 2: Visual Teaching Benchmarks (GOOD / CONCERN / CRITICAL) */

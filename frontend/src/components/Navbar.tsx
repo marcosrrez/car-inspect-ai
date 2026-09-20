@@ -7,7 +7,6 @@ import {
   FileText,
   Settings,
   RotateCcw,
-  Sparkles,
   Wifi,
   WifiOff,
   Wrench,
@@ -15,7 +14,7 @@ import {
   ChevronDown,
   Plus,
   Bookmark,
-  Scale,
+  Trash2,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
 
@@ -24,13 +23,13 @@ export const Navbar: React.FC = () => {
     vehicle,
     garageVehicles,
     switchActiveVehicle,
+    deleteVehicle,
     activeTab,
     setActiveTab,
-    setVehicleEditModalOpen,
+    openVehicleModal,
     setReportModalOpen,
     setObdModalOpen,
     resetChecklist,
-    loadDemoScenario,
     getCompletedCount,
     getAllItems,
     savedHuntSnapshots,
@@ -85,7 +84,9 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="min-w-0 flex items-center gap-1">
               <span className="font-semibold text-xs sm:text-sm text-zinc-900 truncate max-w-[110px] sm:max-w-[150px]">
-                {vehicle.year} {vehicle.make} {vehicle.model}
+                {vehicle
+                  ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+                  : "Add a vehicle"}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-700 transition" />
             </div>
@@ -95,44 +96,82 @@ export const Navbar: React.FC = () => {
           {garageDropdownOpen && (
             <div className="absolute left-0 mt-2 w-64 bg-white border border-zinc-200/80 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-3 py-1.5 border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                My Garage ({garageVehicles.length} Vehicles)
+                My Garage ({garageVehicles.length}{" "}
+                {garageVehicles.length === 1 ? "Vehicle" : "Vehicles"})
               </div>
 
-              <div className="py-1 space-y-0.5 max-h-48 overflow-y-auto">
-                {garageVehicles.map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      switchActiveVehicle(v.id);
-                      setGarageDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition ${
-                      v.id === vehicle.id
-                        ? "bg-orange-50 text-orange-950 font-bold border border-orange-200/60"
-                        : "text-zinc-700 hover:bg-zinc-50 font-medium"
-                    }`}
-                  >
-                    <span className="truncate mr-2">
-                      {v.year} {v.make} {v.model}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 shrink-0">
-                      {(v.mileage || 0).toLocaleString()} mi
-                    </span>
-                  </button>
-                ))}
-              </div>
+              {garageVehicles.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-zinc-500 leading-relaxed">
+                  No vehicles yet. Add one to start inspecting.
+                </div>
+              ) : (
+                <div className="py-1 space-y-0.5 max-h-48 overflow-y-auto">
+                  {garageVehicles.map((v) => (
+                    <div
+                      key={v.id}
+                      className={`group/veh w-full px-2 py-2 rounded-xl text-xs flex items-center justify-between transition ${
+                        v.id === vehicle?.id
+                          ? "bg-orange-50 text-orange-950 font-bold border border-orange-200/60"
+                          : "text-zinc-700 hover:bg-zinc-50 font-medium"
+                      }`}
+                    >
+                      <button
+                        onClick={() => {
+                          switchActiveVehicle(v.id);
+                          setGarageDropdownOpen(false);
+                        }}
+                        className="flex-1 min-w-0 text-left flex items-center justify-between gap-2 pl-1"
+                      >
+                        <span className="truncate">
+                          {v.year} {v.make} {v.model}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 shrink-0">
+                          {(v.mileage || 0).toLocaleString()} mi
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Remove ${v.year} ${v.make} ${v.model} from your garage? This clears its inspection.`
+                            )
+                          ) {
+                            deleteVehicle(v.id);
+                          }
+                        }}
+                        className="ml-1 w-6 h-6 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 flex items-center justify-center shrink-0 transition"
+                        aria-label="Remove vehicle"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              <div className="pt-1 border-t border-zinc-100">
+              <div className="pt-1 border-t border-zinc-100 space-y-0.5">
                 <button
                   onClick={() => {
                     setGarageDropdownOpen(false);
-                    setVehicleEditModalOpen(true);
+                    openVehicleModal("add");
                   }}
                   className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-orange-600 font-semibold flex items-center gap-1.5 transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add / Edit Vehicle</span>
+                  <span>Add Vehicle</span>
                 </button>
+                {vehicle && (
+                  <button
+                    onClick={() => {
+                      setGarageDropdownOpen(false);
+                      openVehicleModal("edit");
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 font-medium flex items-center gap-1.5 transition"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Edit Current Vehicle</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -209,7 +248,7 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   {isOnline ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
-                  {isOnline ? "Online" : "Offline Lot Shield"}
+                  {isOnline ? "Online" : "Offline"}
                 </span>
               </div>
 
@@ -226,78 +265,46 @@ export const Navbar: React.FC = () => {
                 </button>
 
                 <button
+                  disabled={!vehicle}
                   onClick={() => {
                     setMenuOpen(false);
                     setReportModalOpen(true);
                   }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition"
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <FileText className="w-4 h-4 text-zinc-400" />
-                  <span>Certified Dossier ({completedCount}/{totalCount})</span>
+                  <span>Inspection Report ({completedCount}/{totalCount})</span>
                 </button>
 
                 <button
+                  disabled={!vehicle}
                   onClick={() => {
                     setMenuOpen(false);
-                    setVehicleEditModalOpen(true);
+                    openVehicleModal("edit");
                   }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition"
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Settings className="w-4 h-4 text-zinc-400" />
                   <span>Edit Vehicle Specs</span>
                 </button>
               </div>
 
-              <div className="pt-1 border-t border-zinc-100">
-                <div className="px-3 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-                  PPI Calibration Scenarios
+              {vehicle && (
+                <div className="pt-1 border-t border-zinc-100">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (confirm("Reset current vehicle inspection?")) {
+                        resetChecklist();
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-xs text-red-600 flex items-center gap-2.5 transition"
+                  >
+                    <RotateCcw className="w-4 h-4 text-red-400" />
+                    <span>Reset Checklist</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    loadDemoScenario("clean_pass");
-                  }}
-                  className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-50 text-xs text-zinc-700 flex items-center justify-between transition"
-                >
-                  <span>Clean Pass</span>
-                  <span className="text-[10px] text-emerald-600 font-medium">Grade A+</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    loadDemoScenario("blown_head_gasket");
-                  }}
-                  className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-50 text-xs text-zinc-700 flex items-center justify-between transition"
-                >
-                  <span>Head Gasket Fault</span>
-                  <span className="text-[10px] text-red-600 font-medium">Walk Away</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    loadDemoScenario("rod_knock");
-                  }}
-                  className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-50 text-xs text-zinc-700 flex items-center justify-between transition"
-                >
-                  <span>AST Rod Knock</span>
-                  <span className="text-[10px] text-red-600 font-medium">Walk Away</span>
-                </button>
-              </div>
-
-              <div className="pt-1 border-t border-zinc-100">
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    if (confirm("Reset current vehicle inspection?")) {
-                      resetChecklist();
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-xs text-red-600 flex items-center gap-2.5 transition"
-                >
-                  <RotateCcw className="w-4 h-4 text-red-400" />
-                  <span>Reset Checklist</span>
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>

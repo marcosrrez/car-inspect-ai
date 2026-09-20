@@ -1,45 +1,69 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Car,
   Check,
   Search,
   RefreshCw,
-  ShieldAlert,
-  Sparkles,
-  Zap,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { decodeVinNumber } from "../utils/vinDecoder";
+
+const EMPTY_FORM = {
+  year: new Date().getFullYear(),
+  make: "",
+  model: "",
+  trim: "",
+  mileage: 0,
+  asking_price: 0,
+  vin: "",
+};
 
 export const VehicleEditModal: React.FC = () => {
   const {
     vehicle,
     updateVehicle,
+    addVehicleToGarage,
     vehicleEditModalOpen,
     setVehicleEditModalOpen,
+    vehicleModalMode,
   } = useInspectionStore();
 
-  const [formData, setFormData] = useState({
-    year: vehicle.year,
-    make: vehicle.make,
-    model: vehicle.model,
-    trim: vehicle.trim || "",
-    mileage: vehicle.mileage || 118000,
-    asking_price: vehicle.asking_price || 14500,
-    vin: vehicle.vin || "",
-  });
+  // In "edit" mode we pre-fill from the active vehicle; in "add" mode we start blank.
+  const isEdit = vehicleModalMode === "edit" && !!vehicle;
 
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [decoding, setDecoding] = useState(false);
   const [decodeMsg, setDecodeMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Reset the form each time the modal opens, based on add vs. edit mode.
+  useEffect(() => {
+    if (!vehicleEditModalOpen) return;
+    setDecodeMsg(null);
+    setErrorMsg(null);
+    if (isEdit && vehicle) {
+      setFormData({
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim || "",
+        mileage: vehicle.mileage || 0,
+        asking_price: vehicle.asking_price || 0,
+        vin: vehicle.vin || "",
+      });
+    } else {
+      setFormData(EMPTY_FORM);
+    }
+  }, [vehicleEditModalOpen, isEdit, vehicle]);
 
   if (!vehicleEditModalOpen) return null;
 
   const handleDecodeVin = async () => {
-    if (!formData.vin || formData.vin.trim().length < 11) {
-      setDecodeMsg("Please enter at least 11-17 VIN characters.");
+    if (!formData.vin || formData.vin.trim().length !== 17) {
+      setDecodeMsg("Enter the full 17-character VIN to decode.");
       return;
     }
 
@@ -52,33 +76,28 @@ export const VehicleEditModal: React.FC = () => {
         year: decoded.year,
         make: decoded.make,
         model: decoded.model,
-        trim: `${decoded.trim ? decoded.trim + " " : ""}${decoded.engine || ""}`,
+        trim: `${decoded.trim ? decoded.trim + " " : ""}${decoded.engine || ""}`.trim(),
         vin: decoded.vin,
       }));
       setDecodeMsg(`✓ Decoded via NHTSA: ${decoded.year} ${decoded.make} ${decoded.model} (${decoded.engine}, ${decoded.drive_type})`);
     } catch (err: any) {
-      setDecodeMsg(err.message || "Failed to decode VIN.");
+      setDecodeMsg(err.message || "Couldn't decode that VIN. You can enter the details manually below.");
     } finally {
       setDecoding(false);
     }
   };
 
-  const handlePresetSelect = (preset: {
-    year: number;
-    make: string;
-    model: string;
-    trim: string;
-    vin: string;
-    asking_price: number;
-    mileage: number;
-  }) => {
-    setFormData(preset);
-    setDecodeMsg(`✓ Loaded ${preset.year} ${preset.make} ${preset.model} specs.`);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateVehicle(formData);
+    if (!formData.make.trim() || !formData.model.trim()) {
+      setErrorMsg("Make and model are required.");
+      return;
+    }
+    if (isEdit) {
+      updateVehicle(formData);
+    } else {
+      addVehicleToGarage({ ...formData, is_turbocharged: false });
+    }
     setVehicleEditModalOpen(false);
   };
 
@@ -92,9 +111,11 @@ export const VehicleEditModal: React.FC = () => {
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-orange-600">
-                NHTSA VIN & Spec Decoder
+                {isEdit ? "Edit Vehicle Details" : "Add a Vehicle"}
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-zinc-900">Vehicle Profile</h3>
+              <h3 className="text-base sm:text-lg font-bold text-zinc-900">
+                {isEdit ? "Vehicle Profile" : "New Vehicle"}
+              </h3>
             </div>
           </div>
           <button
@@ -105,48 +126,10 @@ export const VehicleEditModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Quick Benchmark Preset Buttons */}
-        <div className="mb-4">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-            Quick Platform Presets:
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 text-xs">
-            <button
-              type="button"
-              onClick={() =>
-                handlePresetSelect({
-                  year: 2015,
-                  make: "Toyota",
-                  model: "Highlander",
-                  trim: "V6 Limited AWD (2GR-FE)",
-                  vin: "4T3BK3BB0FU123456",
-                  asking_price: 16500,
-                  mileage: 115000,
-                })
-              }
-              className="p-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-left font-medium text-zinc-800 transition truncate"
-            >
-              2015 Highlander V6
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                handlePresetSelect({
-                  year: 2016,
-                  make: "Honda",
-                  model: "Odyssey",
-                  trim: "EX-L (3.5L J35 V6)",
-                  vin: "5FNRL5H64GB123456",
-                  asking_price: 15800,
-                  mileage: 104000,
-                })
-              }
-              className="p-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-left font-medium text-zinc-800 transition truncate"
-            >
-              2016 Odyssey EX-L
-            </button>
-          </div>
-        </div>
+        <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+          Enter the VIN to auto-fill from the free NHTSA database, or type the
+          details in manually. Everything is stored locally on this device.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           {/* VIN Input with NHTSA Live Decode Button */}
@@ -274,13 +257,19 @@ export const VehicleEditModal: React.FC = () => {
             />
           </div>
 
+          {errorMsg && (
+            <div className="text-[11px] font-medium text-red-600 bg-red-50 border border-red-200/70 rounded-lg p-2">
+              {errorMsg}
+            </div>
+          )}
+
           <div className="pt-2">
             <button
               type="submit"
               className="w-full h-12 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:scale-99 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2"
             >
               <Check className="w-4 h-4" />
-              <span>Apply Vehicle Specs</span>
+              <span>{isEdit ? "Save Changes" : "Add to Garage"}</span>
             </button>
           </div>
         </form>

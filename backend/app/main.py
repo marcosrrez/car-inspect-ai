@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
@@ -10,11 +11,18 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Enable CORS for local Next.js frontend and mobile web clients
+# CORS: restrict to configured origins in production. Set CORS_ALLOW_ORIGINS to a
+# comma-separated list of allowed origins (e.g. "https://app.example.com").
+# Defaults to "*" for local development. Credentials are only enabled when a
+# specific origin allow-list is provided (browsers reject "*" + credentials).
+_origins_env = os.environ.get("CORS_ALLOW_ORIGINS", "*").strip()
+_allow_origins = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
+_allow_credentials = _allow_origins != ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -31,7 +39,6 @@ async def root():
             "audio_ast": "/api/v1/diagnose/audio",
             "vision_vlm": "/api/v1/diagnose/vision",
             "reports": "/api/v1/reports/generate",
-            "samples": "/api/v1/samples/list",
             "docs": "/docs"
         }
     }
