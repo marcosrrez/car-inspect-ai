@@ -420,187 +420,13 @@ const INITIAL_STATIONS: Station[] = [
   },
 ];
 
-const INITIAL_GARAGE: VehicleProfile[] = [
-  {
-    id: "veh_odyssey_2016",
-    year: 2016,
-    make: "Honda",
-    model: "Odyssey",
-    trim: "EX-L",
-    mileage: 104000,
-    asking_price: 15800,
-    vin: "5FNRL5H64GB123456",
-    is_turbocharged: false,
-  },
-  {
-    id: "veh_highlander_2015",
-    year: 2015,
-    make: "Toyota",
-    model: "Highlander",
-    trim: "V6 Limited AWD",
-    mileage: 115000,
-    asking_price: 16500,
-    vin: "4T3BK3BB0FU123456",
-    is_turbocharged: false,
-  },
-  {
-    id: "veh_lexus_rx350_2018",
-    year: 2018,
-    make: "Lexus",
-    model: "RX 350",
-    trim: "F-Sport AWD",
-    mileage: 68000,
-    asking_price: 28500,
-    vin: "2T2HZMCA5KC789012",
-    is_turbocharged: false,
-  },
-  {
-    id: "veh_rav4_hybrid_2021",
-    year: 2021,
-    make: "Toyota",
-    model: "RAV4",
-    trim: "XSE Hybrid AWD",
-    mileage: 42000,
-    asking_price: 31000,
-    vin: "4T3BWRFV5MU345678",
-    is_turbocharged: false,
-  }
-];
+// Production starts with an empty garage. Users add their own vehicles,
+// hunt snapshots, and service records — no seeded demo content.
+const INITIAL_GARAGE: VehicleProfile[] = [];
 
-const INITIAL_HUNT_SNAPSHOTS: SavedInspectionSnapshot[] = [
-  {
-    id: "snap_highlander_dealer1",
-    savedAt: "2026-08-20T14:30:00Z",
-    vehicle: {
-      id: "veh_highlander_2015",
-      year: 2015,
-      make: "Toyota",
-      model: "Highlander",
-      trim: "V6 Limited AWD",
-      mileage: 115000,
-      asking_price: 16500,
-      vin: "4T3BK3BB0FU123456",
-      is_turbocharged: false,
-    },
-    total_score: -4,
-    verdict: "FAIR / NEGOTIATE",
-    has_fatal_walk: false,
-    total_estimated_repairs_usd: 2450,
-    recommended_offer_usd: 14050,
-    completed_count: 20,
-    total_items: 20,
-    items_summary: [
-      {
-        id: "s2_timing_cover",
-        title: "Front Engine Timing Cover Seam",
-        finding_category: "Wet, grimy",
-        points: -5,
-        is_walk: false,
-        explanation: "Active oil seepage along timing cover perimeter seam.",
-        negotiation_tip: "Require $1,800 discount for timing cover reseal.",
-      },
-      {
-        id: "s4_tire_tread",
-        title: "Tire Tread Depth & Wear Pattern",
-        finding_category: "Inner / outer shoulder bald",
-        points: -3,
-        is_walk: false,
-        explanation: "Front tires worn bald at inner shoulder from camber alignment issue.",
-        negotiation_tip: "Deduct $650 for two new front tires and 4-wheel alignment.",
-      }
-    ],
-    deal_notes: [
-      {
-        id: "note_1",
-        timestamp: "2026-08-20T15:00:00Z",
-        author: "buyer",
-        text: "Salesman Mike offered $15,500. Showed him the timing cover photo and tire wear, pushed for $14,200.",
-      },
-      {
-        id: "note_2",
-        timestamp: "2026-08-21T10:15:00Z",
-        author: "seller",
-        text: "Dealer called back agreeing to put 2 new front tires on if I take $15,000. Countering at $14,500.",
-      }
-    ],
-    seller_info: {
-      seller_name: "Mike Sullivan (Sales Mgr)",
-      dealership_or_location: "Metro Toyota Used Lot, 1200 Auto Mall Blvd",
-      phone: "(555) 234-8901",
-      listing_url: "https://www.autotrader.com",
-    }
-  },
-  {
-    id: "snap_odyssey_craigslist",
-    savedAt: "2026-08-22T11:00:00Z",
-    vehicle: {
-      id: "veh_odyssey_2016",
-      year: 2016,
-      make: "Honda",
-      model: "Odyssey",
-      trim: "EX-L",
-      mileage: 104000,
-      asking_price: 15800,
-      vin: "5FNRL5H64GB123456",
-      is_turbocharged: false,
-    },
-    total_score: 18,
-    verdict: "EXCELLENT BUY",
-    has_fatal_walk: false,
-    total_estimated_repairs_usd: 1200,
-    recommended_offer_usd: 14600,
-    completed_count: 20,
-    total_items: 20,
-    items_summary: [
-      {
-        id: "s1_oil_cap",
-        title: "Oil Filler Cap Underside",
-        finding_category: "Clean, amber / dry",
-        points: 2,
-        is_walk: false,
-      }
-    ],
-    deal_notes: [
-      {
-        id: "note_3",
-        timestamp: "2026-08-22T11:45:00Z",
-        author: "buyer",
-        text: "Private seller John. Clean Carfax, 1-owner. Timing belt is due at 105k miles ($1,200). Offering $14,600 cash.",
-      }
-    ],
-    seller_info: {
-      seller_name: "John Miller (Private Seller)",
-      dealership_or_location: "South Suburbs, Meet at Chase Bank",
-      phone: "(555) 876-5432",
-      listing_url: "https://craigslist.org",
-    }
-  }
-];
+const INITIAL_HUNT_SNAPSHOTS: SavedInspectionSnapshot[] = [];
 
-const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [
-  {
-    id: "rec_1",
-    task_id: "engine_oil_filter",
-    title: "Full Synthetic Engine Oil & OEM Filter",
-    date: "2026-05-10",
-    mileage: 112000,
-    cost_usd: 48,
-    performed_by: "diy",
-    parts_brand: "Toyota Genuine 0W-20 & OEM Denso Filter",
-    notes: "New crush washer installed, torqued drain plug to 30 ft-lbs.",
-  },
-  {
-    id: "rec_2",
-    task_id: "brake_fluid_flush",
-    title: "Hydraulic Brake Fluid Flush & Bleed",
-    date: "2025-11-15",
-    mileage: 105000,
-    cost_usd: 120,
-    performed_by: "professional",
-    parts_brand: "Toyota Genuine DOT 3",
-    notes: "Flushed 4 calipers until fluid was clear.",
-  }
-];
+const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [];
 
 interface WalkAwayReason {
   componentName: string;
@@ -613,10 +439,11 @@ interface InspectionState {
 
   // Multi-Vehicle Garage
   garageVehicles: VehicleProfile[];
-  activeVehicleId: string;
-  vehicle: VehicleProfile;
+  activeVehicleId: string | null;
+  vehicle: VehicleProfile | null;
   switchActiveVehicle: (id: string) => void;
   addVehicleToGarage: (v: Omit<VehicleProfile, "id">) => void;
+  deleteVehicle: (id: string) => void;
 
   stations: Station[];
   activeStationId: string;
@@ -629,6 +456,8 @@ interface InspectionState {
   walkAwayReason: WalkAwayReason | null;
   reportModalOpen: boolean;
   vehicleEditModalOpen: boolean;
+  vehicleModalMode: "add" | "edit";
+  openVehicleModal: (mode: "add" | "edit") => void;
   obdModalOpen: boolean;
 
   // Service Logbook
@@ -678,7 +507,6 @@ interface InspectionState {
 
   quickScoreItem: (itemId: string, opt: RubricOption) => void;
   resetChecklist: () => void;
-  loadDemoScenario: (scenario: "clean_pass" | "blown_head_gasket" | "rod_knock" | "high_negotiation") => void;
 
   // Computed Selectors
   getAllItems: () => ChecklistItem[];
@@ -696,8 +524,8 @@ export const useInspectionStore = create<InspectionState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       garageVehicles: INITIAL_GARAGE,
-      activeVehicleId: INITIAL_GARAGE[0].id,
-      vehicle: INITIAL_GARAGE[0],
+      activeVehicleId: null,
+      vehicle: null,
 
       switchActiveVehicle: (id) => {
         const found = get().garageVehicles.find((v) => v.id === id);
@@ -725,6 +553,22 @@ export const useInspectionStore = create<InspectionState>()(
         }));
       },
 
+      deleteVehicle: (id) => {
+        set((state) => {
+          const remaining = state.garageVehicles.filter((v) => v.id !== id);
+          const wasActive = state.activeVehicleId === id;
+          const nextActive = wasActive ? remaining[0] || null : state.vehicle;
+          return {
+            garageVehicles: remaining,
+            activeVehicleId: wasActive ? nextActive?.id ?? null : state.activeVehicleId,
+            vehicle: wasActive ? nextActive : state.vehicle,
+            ...(wasActive
+              ? { stations: INITIAL_STATIONS, activeStationId: "station_1" }
+              : {}),
+          };
+        });
+      },
+
       stations: INITIAL_STATIONS,
       activeStationId: "station_1",
       
@@ -735,6 +579,9 @@ export const useInspectionStore = create<InspectionState>()(
       walkAwayReason: null,
       reportModalOpen: false,
       vehicleEditModalOpen: false,
+      vehicleModalMode: "add",
+      openVehicleModal: (mode) =>
+        set({ vehicleModalMode: mode, vehicleEditModalOpen: true }),
       obdModalOpen: false,
 
       serviceHistory: INITIAL_SERVICE_RECORDS,
@@ -746,6 +593,7 @@ export const useInspectionStore = create<InspectionState>()(
         const hasFatal = get().hasWalkAwayCondition();
         const completed = get().getCompletedCount();
         const vehicle = get().vehicle;
+        if (!vehicle) return "";
 
         const deductions = items
           .filter((it) => it.status === "inspected" && it.points < 0)
@@ -846,6 +694,7 @@ export const useInspectionStore = create<InspectionState>()(
 
       updateVehicle: (patch) =>
         set((state) => {
+          if (!state.vehicle) return {};
           const updated = { ...state.vehicle, ...patch };
           return {
             vehicle: updated,
@@ -941,147 +790,6 @@ export const useInspectionStore = create<InspectionState>()(
         });
       },
 
-      loadDemoScenario: (scenario) => {
-        set((state) => {
-          const updatedStations = state.stations.map((st) => ({
-            ...st,
-            items: st.items.map((it) => {
-              if (scenario === "clean_pass") {
-                const opt = it.rubric_summary[0];
-                return {
-                  ...it,
-                  status: "inspected" as const,
-                  finding_category: opt.label,
-                  points: opt.points,
-                  is_walk_condition: false,
-                  explanation: opt.explanation || `Inspected ${it.title} in clean condition.`,
-                  negotiation_tip: null,
-                  confidence: 0.96,
-                  last_inspected_at: new Date().toISOString(),
-                };
-              } else if (scenario === "blown_head_gasket") {
-                if (it.id === "s1_dipstick" || it.id === "s1_oil_cap") {
-                  return {
-                    ...it,
-                    status: "inspected" as const,
-                    finding_category: "Milkshake, foamy",
-                    points: -10,
-                    is_walk_condition: true,
-                    explanation: "Severe emulsified coolant foam on dipstick and oil cap underside.",
-                    negotiation_tip: "WALK AWAY. Head gasket blown or cracked block. Catastrophic engine risk.",
-                    confidence: 0.98,
-                    last_inspected_at: new Date().toISOString(),
-                  };
-                }
-                const opt = it.rubric_summary[0];
-                return {
-                  ...it,
-                  status: "inspected" as const,
-                  finding_category: opt.label,
-                  points: opt.points,
-                  is_walk_condition: false,
-                  explanation: opt.explanation || `Inspected ${it.title} in standard condition.`,
-                  negotiation_tip: null,
-                  confidence: 0.94,
-                  last_inspected_at: new Date().toISOString(),
-                };
-              } else if (scenario === "rod_knock") {
-                if (it.id === "s2_audio_idle") {
-                  return {
-                    ...it,
-                    status: "inspected" as const,
-                    finding_category: "Rod knock / Bearing failure",
-                    points: -10,
-                    is_walk_condition: true,
-                    explanation: "Heavy percussive bottom-end double knock from cylinder 3 connecting rod bearing.",
-                    negotiation_tip: "DO NOT PURCHASE. Bottom end rod bearing failure imminent. Teardown needed.",
-                    confidence: 0.97,
-                    last_inspected_at: new Date().toISOString(),
-                  };
-                }
-                const opt = it.rubric_summary[0];
-                return {
-                  ...it,
-                  status: "inspected" as const,
-                  finding_category: opt.label,
-                  points: opt.points,
-                  is_walk_condition: false,
-                  explanation: opt.explanation || `Inspected ${it.title} in standard condition.`,
-                  negotiation_tip: null,
-                  confidence: 0.92,
-                  last_inspected_at: new Date().toISOString(),
-                };
-              } else {
-                if (it.id === "s2_timing_cover") {
-                  return {
-                    ...it,
-                    status: "inspected" as const,
-                    finding_category: "Wet, grimy",
-                    points: -5,
-                    is_walk_condition: false,
-                    explanation: "Active oil seepage and road grime caked on front timing cover seam.",
-                    negotiation_tip: "Require $1,800 discount for front engine disassembly and timing cover reseal.",
-                    confidence: 0.94,
-                    last_inspected_at: new Date().toISOString(),
-                  };
-                }
-                if (it.id === "s3_oil_pan_leaks") {
-                  return {
-                    ...it,
-                    status: "inspected" as const,
-                    finding_category: "Active dripping / wet casing",
-                    points: -5,
-                    is_walk_condition: false,
-                    explanation: "Hanging oil droplets on lower bellhousing inspection plate.",
-                    negotiation_tip: "Deduct $1,200 for rear main seal and oil pan gasket replacement.",
-                    confidence: 0.91,
-                    last_inspected_at: new Date().toISOString(),
-                  };
-                }
-                if (it.id === "s4_tire_tread") {
-                  return {
-                    ...it,
-                    status: "inspected" as const,
-                    finding_category: "Inner / outer shoulder bald",
-                    points: -3,
-                    is_walk_condition: false,
-                    explanation: "Front tires worn bald at inner shoulder from camber alignment issue.",
-                    negotiation_tip: "Deduct $650 for two new front tires and 4-wheel alignment.",
-                    confidence: 0.95,
-                    last_inspected_at: new Date().toISOString(),
-                  };
-                }
-                const opt = it.rubric_summary[0];
-                return {
-                  ...it,
-                  status: "inspected" as const,
-                  finding_category: opt.label,
-                  points: opt.points,
-                  is_walk_condition: false,
-                  explanation: opt.explanation || `Inspected ${it.title} in acceptable condition.`,
-                  negotiation_tip: null,
-                  confidence: 0.94,
-                  last_inspected_at: new Date().toISOString(),
-                };
-              }
-            }),
-          }));
-
-          const hasWalk = scenario === "blown_head_gasket" || scenario === "rod_knock";
-          const walkItem = hasWalk
-            ? updatedStations.flatMap((s) => s.items).find((i) => i.is_walk_condition) || null
-            : null;
-
-          return {
-            stations: updatedStations,
-            walkAwayModalOpen: hasWalk,
-            walkAwayReason: walkItem
-              ? { componentName: walkItem.title, explanation: walkItem.explanation || "" }
-              : null,
-          };
-        });
-      },
-
       getAllItems: () => get().stations.flatMap((s) => s.items),
       getTotalPoints: () =>
         get()
@@ -1108,7 +816,7 @@ export const useInspectionStore = create<InspectionState>()(
       },
     }),
     {
-      name: "car-inspect-store-v5",
+      name: "car-inspect-store-v6",
       storage: createJSONStorage(() => localStorage),
     }
   )

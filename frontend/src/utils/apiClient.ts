@@ -98,20 +98,3 @@ export async function generateOverallReport(
   return await res.json();
 }
 
-export async function getSamplePresets(): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/samples/list`);
-  if (!res.ok) throw new Error("Failed to fetch sample presets");
-  return await res.json();
-}
-
-export async function fetchSampleAudioBlob(presetId: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/samples/audio/${presetId}`);
-  if (!res.ok) throw new Error(`Failed to fetch audio sample ${presetId}`);
-  return await res.blob();
-}
-
-export async function fetchSampleImageBlob(presetId: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/samples/image/${presetId}`);
-  if (!res.ok) throw new Error(`Failed to fetch image sample ${presetId}`);
-  return await res.blob();
-}

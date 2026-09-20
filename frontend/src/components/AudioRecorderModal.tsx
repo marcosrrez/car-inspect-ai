@@ -12,7 +12,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
-import { diagnoseAudio, fetchSampleAudioBlob } from "../utils/apiClient";
+import { diagnoseAudio } from "../utils/apiClient";
 import { DiagnosticConfirmationModal } from "./DiagnosticConfirmationModal";
 
 export const AudioRecorderModal: React.FC = () => {
@@ -101,11 +101,11 @@ export const AudioRecorderModal: React.FC = () => {
     setIsRecording(false);
   };
 
-  const processAudioBlob = async (blob: Blob, presetFault?: string) => {
+  const processAudioBlob = async (blob: Blob) => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const diagResult = await diagnoseAudio(blob, "idling", presetFault);
+      const diagResult = await diagnoseAudio(blob, "idling");
 
       setPendingDiagnostic({
         itemId: item.id,
@@ -122,19 +122,6 @@ export const AudioRecorderModal: React.FC = () => {
       console.error(err);
       setErrorMsg(err.message || "Acoustic analysis failed. Please retry.");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTestSample = async (presetId: string, faultName: string) => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const sampleBlob = await fetchSampleAudioBlob(presetId);
-      await processAudioBlob(sampleBlob, faultName);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Failed to analyze sample.");
       setLoading(false);
     }
   };
@@ -294,36 +281,11 @@ export const AudioRecorderModal: React.FC = () => {
                 </button>
               )}
 
-              {/* Test / Calibrated Acoustic Benchmarks */}
-              <div className="pt-3 border-t border-zinc-100">
-                <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                  Or test with calibrated engine audio:
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    { id: "healthy_idle", name: "Healthy Idle", pts: "+3", walk: false },
-                    { id: "rod_knock", name: "Rod Knock", pts: "-10", walk: true },
-                    { id: "lifter_tick", name: "Lifter Tick", pts: "-2", walk: false },
-                    { id: "belt_squeal", name: "Belt Squeal", pts: "-1", walk: false },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      disabled={loading || isRecording}
-                      onClick={() => handleTestSample(p.id, p.name)}
-                      className="px-3 py-2 rounded-xl text-xs font-medium text-left border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 transition flex items-center justify-between"
-                    >
-                      <span>{p.name}</span>
-                      <span
-                        className={`text-[10px] font-bold ${
-                          p.walk ? "text-red-600" : "text-zinc-600"
-                        }`}
-                      >
-                        {p.walk ? "Walk Away" : p.pts}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Manual fallback hint */}
+              <p className="text-[11px] text-zinc-400 text-center leading-relaxed pt-1">
+                Prefer to score it yourself? Close this and tap the matching
+                condition from the checklist.
+              </p>
             </div>
           ) : (
             /* TAB 2: Acoustic Reference Benchmarks */

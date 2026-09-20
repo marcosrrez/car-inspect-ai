@@ -41,11 +41,13 @@ export const GarageCareView: React.FC = () => {
 
   // Form State
   const [logDate, setLogDate] = useState(new Date().toISOString().split("T")[0]);
-  const [logMileage, setLogMileage] = useState(vehicle.mileage || 115000);
+  const [logMileage, setLogMileage] = useState(vehicle?.mileage || 0);
   const [logCost, setLogCost] = useState(50);
   const [logPerformedBy, setLogPerformedBy] = useState<"diy" | "professional">("diy");
   const [logPartsBrand, setLogPartsBrand] = useState("");
   const [logNotes, setLogNotes] = useState("");
+
+  if (!vehicle) return null;
 
   const filteredTasks = CAR_CARE_NUT_MAINTENANCE_TASKS.filter((task) => {
     if (filterCategory === "all") return true;
@@ -98,7 +100,7 @@ export const GarageCareView: React.FC = () => {
 
   const handleOpenLogModal = (task: MaintenanceTask) => {
     setSelectedTaskForLog(task);
-    setLogMileage(vehicle.mileage || 115000);
+    setLogMileage(vehicle.mileage || 0);
     setLogPartsBrand(task.oem_spec_note.split(".")[0]);
     setLogModalOpen(true);
   };
@@ -160,7 +162,7 @@ export const GarageCareView: React.FC = () => {
           <Car className="w-4 h-4 text-zinc-400" />
           <span>Current Odometer:</span>
           <strong className="text-zinc-900 text-sm font-bold">
-            {(vehicle.mileage || 115000).toLocaleString()} mi
+            {(vehicle.mileage || 0).toLocaleString()} mi
           </strong>
         </div>
 
@@ -168,7 +170,7 @@ export const GarageCareView: React.FC = () => {
           onClick={() => {
             const newMiles = prompt(
               "Update current vehicle mileage:",
-              String(vehicle.mileage || 115000)
+              String(vehicle.mileage || 0)
             );
             if (newMiles && !isNaN(Number(newMiles))) {
               updateVehicle({ mileage: parseInt(newMiles) });

@@ -14,7 +14,7 @@ import { VehicleEditModal } from "../components/VehicleEditModal";
 import { InspectionReportModal } from "../components/InspectionReportModal";
 import { ObdDecoderModal } from "../components/ObdDecoderModal";
 import { useInspectionStore } from "../store/useInspectionStore";
-import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Car, Plus } from "lucide-react";
 
 export default function Home() {
   const {
@@ -25,6 +25,8 @@ export default function Home() {
     setReportModalOpen,
     obdModalOpen,
     setObdModalOpen,
+    vehicle,
+    openVehicleModal,
   } = useInspectionStore();
 
   const [isClient, setIsClient] = useState(false);
@@ -72,7 +74,33 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 pt-2">
-        {activeTab === "inspection" ? (
+        {!vehicle ? (
+          /* Empty garage — first-run onboarding */
+          <div className="mt-10 sm:mt-16 flex flex-col items-center text-center px-2 animate-in fade-in duration-200">
+            <div className="w-16 h-16 rounded-3xl bg-orange-500 text-white flex items-center justify-center shadow-sm mb-5">
+              <Car className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
+              Add your first vehicle
+            </h1>
+            <p className="text-sm text-zinc-500 mt-2 max-w-sm leading-relaxed">
+              CarInspect AI walks you through a 20-point pre-purchase inspection,
+              tracks the cars you&apos;re hunting, and logs your maintenance. Start
+              by adding a vehicle — enter a VIN to auto-fill, or type the details
+              in manually.
+            </p>
+            <button
+              onClick={() => openVehicleModal("add")}
+              className="mt-6 h-12 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] text-white text-sm font-semibold shadow-sm transition flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add a Vehicle</span>
+            </button>
+            <p className="text-[11px] text-zinc-400 mt-4">
+              Everything stays on this device.
+            </p>
+          </div>
+        ) : activeTab === "inspection" ? (
           /* Mode 1: Pre-Purchase & 6-Month 20-Point Inspection */
           <>
             <StationNav />
@@ -131,7 +159,7 @@ export default function Home() {
       </main>
 
       {/* Floating Status Pill (Active during Inspection mode) */}
-      {activeTab === "inspection" && <FloatingScorecard />}
+      {activeTab === "inspection" && vehicle && <FloatingScorecard />}
 
       {/* Modals */}
       <CameraCaptureModal />

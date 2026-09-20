@@ -4,8 +4,8 @@
   "description": "AI-Powered Pre-Purchase Vehicle Diagnostics & 20-Point Inspection Wizard",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#020617",
+  "background_color": "#F8F9FA",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/favicon.ico",

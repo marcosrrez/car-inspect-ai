@@ -39,6 +39,10 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
   const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
 
+  // AI photo/audio analysis is an optional enhancement. It can be disabled at
+  // deploy time (NEXT_PUBLIC_ENABLE_AI="false") for a purely manual checklist.
+  const aiEnabled = process.env.NEXT_PUBLIC_ENABLE_AI !== "false";
+
   const isComplete = item.status === "inspected";
   const isWalk = item.is_walk_condition;
   const isConcern = isComplete && !isWalk && item.points < 0;
@@ -65,29 +69,10 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
       {/* State A: Uninspected / Active Workflow */}
       {!isComplete ? (
         <div className="space-y-4">
-          {/* Primary Action Button */}
-          {item.media_type === "audio" ? (
-            <button
-              onClick={() => openAudioModal(item.id)}
-              className="w-full h-13 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-semibold text-sm sm:text-base shadow-sm transition flex items-center justify-center gap-2.5"
-            >
-              <Mic className="w-5 h-5" />
-              <span>Record Engine Audio</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => openCameraModal(item.id)}
-              className="w-full h-13 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-semibold text-sm sm:text-base shadow-sm transition flex items-center justify-center gap-2.5"
-            >
-              <Camera className="w-5 h-5" />
-              <span>Take Photo</span>
-            </button>
-          )}
-
-          {/* Compact Grouped List: Quick Score */}
+          {/* Primary: tap to record your finding against the rubric */}
           <div>
             <div className="text-[11px] font-medium text-zinc-400 mb-1.5 px-0.5">
-              Quick score
+              Select what you see
             </div>
             <div className="bg-white border border-zinc-200/80 rounded-2xl divide-y divide-zinc-100 overflow-hidden shadow-xs">
               {item.rubric_summary.map((opt) => (
@@ -102,7 +87,7 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
                       );
                     }
                   }}
-                  className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-zinc-50/80 active:bg-zinc-100 transition text-xs sm:text-sm font-medium text-zinc-800"
+                  className="w-full px-4 py-3.5 text-left flex items-center justify-between hover:bg-zinc-50/80 active:bg-zinc-100 transition text-sm font-medium text-zinc-800"
                 >
                   <span className="truncate mr-2">{opt.label}</span>
                   <span
@@ -122,6 +107,30 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Optional: AI photo/audio assist */}
+          {aiEnabled && (
+            <button
+              onClick={() =>
+                item.media_type === "audio"
+                  ? openAudioModal(item.id)
+                  : openCameraModal(item.id)
+              }
+              className="w-full h-11 rounded-2xl bg-white border border-zinc-200/80 hover:bg-zinc-50 active:scale-[0.99] text-zinc-700 font-semibold text-xs shadow-xs transition flex items-center justify-center gap-2"
+            >
+              {item.media_type === "audio" ? (
+                <Mic className="w-4 h-4 text-orange-500" />
+              ) : (
+                <Camera className="w-4 h-4 text-orange-500" />
+              )}
+              <span>
+                {item.media_type === "audio"
+                  ? "Analyze engine audio with AI"
+                  : "Analyze a photo with AI"}
+              </span>
+              <span className="text-[10px] font-medium text-zinc-400">Optional</span>
+            </button>
+          )}
 
           {/* Progressive Disclosure: Inspection Guidance */}
           <div className="pt-1">

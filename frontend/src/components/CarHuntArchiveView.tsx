@@ -3,21 +3,12 @@
 import React, { useState } from "react";
 import {
   Bookmark,
-  Plus,
   Trash2,
   Phone,
-  MapPin,
-  ExternalLink,
-  DollarSign,
-  AlertOctagon,
-  CheckCircle2,
-  AlertTriangle,
   MessageSquare,
-  Sparkles,
-  Calendar,
   Send,
   Scale,
-  Car,
+  Search,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -34,7 +25,6 @@ export const CarHuntArchiveView: React.FC = () => {
     getTotalPoints,
     getCompletedCount,
     hasWalkAwayCondition,
-    setActiveTab,
   } = useInspectionStore();
 
   const [activeNoteText, setActiveNoteText] = useState<Record<string, string>>({});
@@ -45,10 +35,34 @@ export const CarHuntArchiveView: React.FC = () => {
   const [dealershipLocation, setDealershipLocation] = useState("");
   const [sellerPhone, setSellerPhone] = useState("");
   const [listingUrl, setListingUrl] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "buy" | "negotiate" | "walk">("all");
 
   const currentScore = getTotalPoints();
   const currentCompleted = getCompletedCount();
   const currentHasFatal = hasWalkAwayCondition();
+
+  const verdictOf = (s: SavedInspectionSnapshot): "buy" | "negotiate" | "walk" =>
+    s.has_fatal_walk ? "walk" : s.total_score >= 15 ? "buy" : "negotiate";
+
+  const filteredSnapshots = savedHuntSnapshots.filter((s) => {
+    const q = searchQuery.trim().toLowerCase();
+    const haystack = [
+      s.vehicle.year,
+      s.vehicle.make,
+      s.vehicle.model,
+      s.vehicle.trim,
+      s.seller_info?.seller_name,
+      s.seller_info?.dealership_or_location,
+      s.verdict,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesQuery = !q || haystack.includes(q);
+    const matchesVerdict = verdictFilter === "all" || verdictOf(s) === verdictFilter;
+    return matchesQuery && matchesVerdict;
+  });
 
   const handleSaveCurrent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,11 +87,6 @@ export const CarHuntArchiveView: React.FC = () => {
     setActiveNoteText({ ...activeNoteText, [snapshotId]: "" });
   };
 
-  const totalDeductionsAll = savedHuntSnapshots.reduce(
-    (sum, s) => sum + s.total_estimated_repairs_usd,
-    0
-  );
-
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Hero Banner: Car Hunt Command Center */}
@@ -99,17 +108,57 @@ export const CarHuntArchiveView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setSaveModalOpen(true)}
-          className="h-11 px-5 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-98 text-white text-xs font-semibold shrink-0 transition flex items-center gap-2 shadow-sm"
-        >
-          <Bookmark className="w-4 h-4" />
-          <span>Save Current Car ({vehicle.model})</span>
-        </button>
+        {vehicle && (
+          <button
+            onClick={() => setSaveModalOpen(true)}
+            className="h-11 px-5 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-98 text-white text-xs font-semibold shrink-0 transition flex items-center gap-2 shadow-sm"
+          >
+            <Bookmark className="w-4 h-4" />
+            <span>Save Current Car ({vehicle.model})</span>
+          </button>
+        )}
       </div>
 
+      {/* Search & Verdict Filter */}
+      {savedHuntSnapshots.length > 0 && (
+        <div className="space-y-2.5">
+          <div className="relative">
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by make, model, seller, or location..."
+              className="w-full h-11 pl-10 pr-3 rounded-2xl border border-zinc-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {(
+              [
+                { id: "all", label: "All" },
+                { id: "buy", label: "Buy" },
+                { id: "negotiate", label: "Negotiate" },
+                { id: "walk", label: "Walk Away" },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setVerdictFilter(f.id)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition ${
+                  verdictFilter === f.id
+                    ? "bg-zinc-900 text-white shadow-xs"
+                    : "bg-zinc-200/50 hover:bg-zinc-200/80 text-zinc-600"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Side-by-Side Car Hunt Comparison Matrix */}
-      {savedHuntSnapshots.length >= 2 && (
+      {filteredSnapshots.length >= 2 && (
         <div className="bg-zinc-900 text-white rounded-3xl p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-orange-400 uppercase tracking-wider">
@@ -117,7 +166,7 @@ export const CarHuntArchiveView: React.FC = () => {
               <span>Side-by-Side Car Comparison</span>
             </div>
             <span className="text-[11px] text-zinc-400">
-              {savedHuntSnapshots.length} options evaluated
+              {filteredSnapshots.length} options evaluated
             </span>
           </div>
 
@@ -134,7 +183,7 @@ export const CarHuntArchiveView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60 font-medium">
-                {savedHuntSnapshots.map((s) => (
+                {filteredSnapshots.map((s) => (
                   <tr key={s.id} className="hover:bg-zinc-800/40 transition">
                     <td className="py-2.5 pr-3 font-bold text-zinc-100 truncate max-w-[140px]">
                       {s.vehicle.year} {s.vehicle.make} {s.vehicle.model}
@@ -172,9 +221,30 @@ export const CarHuntArchiveView: React.FC = () => {
         </div>
       )}
 
+      {/* Empty state — nothing saved yet */}
+      {savedHuntSnapshots.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-3xl border border-zinc-200/70 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
+            <Bookmark className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-zinc-900">No cars saved yet</h3>
+          <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto leading-relaxed">
+            Run an inspection, then tap <strong>Save Current Car</strong> to track
+            it here alongside seller details and your negotiation notes.
+          </p>
+        </div>
+      )}
+
+      {/* No results for current search/filter */}
+      {savedHuntSnapshots.length > 0 && filteredSnapshots.length === 0 && (
+        <div className="text-center py-10 bg-zinc-50 rounded-3xl border border-zinc-200/60 text-zinc-500 text-xs">
+          No saved cars match your search.
+        </div>
+      )}
+
       {/* Saved Car Snapshots List */}
       <div className="space-y-4">
-        {savedHuntSnapshots.map((snapshot) => {
+        {filteredSnapshots.map((snapshot) => {
           const isExpanded = expandedSnapshotId === snapshot.id;
           const noteText = activeNoteText[snapshot.id] || "";
           const noteAuthor = activeNoteAuthor[snapshot.id] || "buyer";
@@ -390,7 +460,7 @@ export const CarHuntArchiveView: React.FC = () => {
       </div>
 
       {/* Save Snapshot Modal */}
-      {saveModalOpen && (
+      {saveModalOpen && vehicle && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
           <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 sm:p-7 shadow-2xl border border-zinc-200/80 animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-4">
