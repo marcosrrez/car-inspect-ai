@@ -16,8 +16,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { isWriteTool } from "../lib/agentTools";
-import { ingestDocument } from "../utils/apiClient";
-import { DocumentExtraction } from "../types/inspection";
+import { compressImage } from "../utils/imageCompression";
 
 interface StagedAction {
   id: string;
@@ -25,7 +24,34 @@ interface StagedAction {
   summary: string;
   applied: boolean;
   data: Record<string, unknown>;
-  extraction?: DocumentExtraction;
+}
+
+function bufToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+// Turn an attached file into a Claude content block (document for PDFs, image otherwise).
+async function fileToBlock(file: File): Promise<Block> {
+  if (file.type === "application/pdf") {
+    const buf = await file.arrayBuffer();
+    return {
+      type: "document",
+      source: { type: "base64", media_type: "application/pdf", data: bufToBase64(buf) },
+    } as unknown as Block;
+  }
+  const comp = await compressImage(file, 1600, 1600, 0.8);
+  const buf = await comp.file.arrayBuffer();
+  const mt = comp.file.type || "image/jpeg";
+  return {
+    type: "image",
+    source: { type: "base64", media_type: mt, data: bufToBase64(buf) },
+  } as unknown as Block;
 }
 
 interface Msg {
@@ -201,9 +227,6 @@ export const AgentChat: React.FC = () => {
     const d = a.data;
     const today = new Date().toISOString().slice(0, 10);
     switch (a.kind) {
-      case "apply_extraction":
-        if (a.extraction) s.applyExtraction(a.extraction, { applyVehicleFields: true });
-        break;
       case "add_service_record":
         s.addServiceRecord({
           task_id: (d.task_id as string) || "general_service",
@@ -325,8 +348,26 @@ export const AgentChat: React.FC = () => {
     return final;
   };
 
+  // Once an attached file has been sent in a turn, replace its heavy base64 block
+  // with a placeholder so it isn't re-uploaded on subsequent tool-loop requests.
+  const stripDocBlocks = () => {
+    apiMsgs.current = apiMsgs.current.map((m) => {
+      if (m.role === "user" && Array.isArray(m.content)) {
+        return {
+          ...m,
+          content: (m.content as Block[]).map((b) =>
+            b.type === "image" || b.type === "document"
+              ? { type: "text", text: "[attached file read above]" }
+              : b
+          ),
+        };
+      }
+      return m;
+    });
+  };
+
   const runAgent = async () => {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const liveId = uid();
       setMsgs((p) => [...p, { id: liveId, role: "assistant", text: "", streaming: true }]);
       let final: { content: Block[]; stop_reason: string };
@@ -338,6 +379,7 @@ export const AgentChat: React.FC = () => {
       }
       const content = final.content || [];
       apiMsgs.current.push({ role: "assistant", content });
+      stripDocBlocks(); // doc consumed by the model this turn; don't resend it again
 
       const staged: StagedAction[] = [];
       const toolResults: Array<Record<string, unknown>> = [];
@@ -370,37 +412,6 @@ export const AgentChat: React.FC = () => {
     }
   };
 
-  const handleAttachment = async (file: File, note: string) => {
-    const userText = note || "Here's a document for my garage.";
-    setMsgs((p) => [...p, { id: uid(), role: "user", text: userText, attachment: file.name }]);
-    const liveId = uid();
-    setMsgs((p) => [...p, { id: liveId, role: "assistant", text: "", streaming: true }]);
-    try {
-      const ex = await ingestDocument(file, useInspectionStore.getState().vehicle);
-      const parts = [
-        ex.service_records?.length ? `${ex.service_records.length} completed service item(s)` : null,
-        ex.pending_items?.length ? `${ex.pending_items.length} recommendation(s)` : null,
-        ex.history_report ? "a history report" : null,
-      ].filter(Boolean);
-      const summary =
-        `I read your ${ex.document_type.toLowerCase()}` +
-        (ex.summary ? ` — ${ex.summary}` : ".") +
-        (parts.length ? `\n\nReady to file: ${parts.join(", ")}.` : "") +
-        "\n\nTap **Apply** to add it to your garage.";
-      const staged: StagedAction = {
-        id: uid(),
-        kind: "apply_extraction",
-        summary: "File everything from this document",
-        applied: false,
-        data: {},
-        extraction: ex,
-      };
-      patchMsg(liveId, { streaming: false, text: summary, staged: [staged] });
-    } catch (e) {
-      patchMsg(liveId, { streaming: false, text: e instanceof Error ? e.message : "Couldn't read that document." });
-    }
-  };
-
   const send = async () => {
     if (busy) return;
     const text = input.trim();
@@ -410,13 +421,37 @@ export const AgentChat: React.FC = () => {
     setPendingFile(null);
     setBusy(true);
     try {
+      // Show the user's turn (text + any attachment).
+      setMsgs((p) => [
+        ...p,
+        { id: uid(), role: "user", text, attachment: file?.name },
+      ]);
+
       if (file) {
-        await handleAttachment(file, text);
+        let block: Block;
+        try {
+          block = await fileToBlock(file);
+        } catch {
+          setMsgs((p) => [
+            ...p,
+            { id: uid(), role: "assistant", text: "I couldn't read that file — try a PDF or a clear photo." },
+          ]);
+          return;
+        }
+        // Send the document AND the user's words together, as one turn, so the
+        // model reasons over both (reconciling, capturing what the user said).
+        const prompt =
+          text ||
+          "Here's a document for my garage. Read it, reconcile it with everything I've told you, and update my records.";
+        apiMsgs.current.push({
+          role: "user",
+          content: [block, { type: "text", text: prompt }] as unknown,
+        });
       } else {
-        setMsgs((p) => [...p, { id: uid(), role: "user", text }]);
         apiMsgs.current.push({ role: "user", content: text });
-        await runAgent();
       }
+
+      await runAgent();
     } finally {
       setBusy(false);
     }
