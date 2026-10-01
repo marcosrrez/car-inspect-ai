@@ -10,7 +10,14 @@ import {
   ServiceRecord,
   SavedInspectionSnapshot,
   DealNote,
+  VehicleHistoryReport,
+  PendingItem,
+  GarageExport,
 } from "../types/inspection";
+
+function genId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
 
 const INITIAL_STATIONS: Station[] = [
   {
@@ -426,8 +433,6 @@ const INITIAL_GARAGE: VehicleProfile[] = [];
 
 const INITIAL_HUNT_SNAPSHOTS: SavedInspectionSnapshot[] = [];
 
-const INITIAL_SERVICE_RECORDS: ServiceRecord[] = [];
-
 interface WalkAwayReason {
   componentName: string;
   explanation: string;
@@ -460,10 +465,30 @@ interface InspectionState {
   openVehicleModal: (mode: "add" | "edit") => void;
   obdModalOpen: boolean;
 
-  // Service Logbook
-  serviceHistory: ServiceRecord[];
+  // Per-vehicle collections (keyed by vehicle id)
+  serviceRecordsByVehicle: Record<string, ServiceRecord[]>;
+  historyReportsByVehicle: Record<string, VehicleHistoryReport[]>;
+  pendingItemsByVehicle: Record<string, PendingItem[]>;
+
+  // Service Logbook (operate on the active vehicle)
   addServiceRecord: (record: Omit<ServiceRecord, "id">) => void;
   deleteServiceRecord: (id: string) => void;
+  getServiceHistory: () => ServiceRecord[];
+
+  // Vehicle history reports (Carfax / AutoCheck / other)
+  addHistoryReport: (report: Omit<VehicleHistoryReport, "id" | "added_at">) => void;
+  deleteHistoryReport: (id: string) => void;
+  getHistoryReports: () => VehicleHistoryReport[];
+
+  // Pending items / deficiencies
+  addPendingItem: (item: Omit<PendingItem, "id" | "created_at" | "resolved"> & { resolved?: boolean }) => void;
+  togglePendingItem: (id: string) => void;
+  deletePendingItem: (id: string) => void;
+  getPendingItems: () => PendingItem[];
+
+  // Backup / restore (local-first import & export)
+  exportGarage: () => GarageExport;
+  importGarage: (payload: unknown) => { ok: boolean; error?: string };
 
   // Car Hunt Archive & Snapshots
   savedHuntSnapshots: SavedInspectionSnapshot[];
@@ -558,10 +583,19 @@ export const useInspectionStore = create<InspectionState>()(
           const remaining = state.garageVehicles.filter((v) => v.id !== id);
           const wasActive = state.activeVehicleId === id;
           const nextActive = wasActive ? remaining[0] || null : state.vehicle;
+          const svc = { ...state.serviceRecordsByVehicle };
+          const rep = { ...state.historyReportsByVehicle };
+          const pen = { ...state.pendingItemsByVehicle };
+          delete svc[id];
+          delete rep[id];
+          delete pen[id];
           return {
             garageVehicles: remaining,
             activeVehicleId: wasActive ? nextActive?.id ?? null : state.activeVehicleId,
             vehicle: wasActive ? nextActive : state.vehicle,
+            serviceRecordsByVehicle: svc,
+            historyReportsByVehicle: rep,
+            pendingItemsByVehicle: pen,
             ...(wasActive
               ? { stations: INITIAL_STATIONS, activeStationId: "station_1" }
               : {}),
@@ -584,7 +618,9 @@ export const useInspectionStore = create<InspectionState>()(
         set({ vehicleModalMode: mode, vehicleEditModalOpen: true }),
       obdModalOpen: false,
 
-      serviceHistory: INITIAL_SERVICE_RECORDS,
+      serviceRecordsByVehicle: {},
+      historyReportsByVehicle: {},
+      pendingItemsByVehicle: {},
       savedHuntSnapshots: INITIAL_HUNT_SNAPSHOTS,
 
       saveCurrentInspectionSnapshot: (sellerInfo) => {
@@ -677,19 +713,166 @@ export const useInspectionStore = create<InspectionState>()(
       },
 
       addServiceRecord: (record) => {
-        const newRecord: ServiceRecord = {
-          ...record,
-          id: `srv_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        };
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        const newRecord: ServiceRecord = { ...record, id: genId("srv") };
         set((state) => ({
-          serviceHistory: [newRecord, ...state.serviceHistory],
+          serviceRecordsByVehicle: {
+            ...state.serviceRecordsByVehicle,
+            [vid]: [newRecord, ...(state.serviceRecordsByVehicle[vid] || [])],
+          },
         }));
       },
 
       deleteServiceRecord: (id) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
         set((state) => ({
-          serviceHistory: state.serviceHistory.filter((r) => r.id !== id),
+          serviceRecordsByVehicle: {
+            ...state.serviceRecordsByVehicle,
+            [vid]: (state.serviceRecordsByVehicle[vid] || []).filter((r) => r.id !== id),
+          },
         }));
+      },
+
+      getServiceHistory: () => {
+        const vid = get().activeVehicleId;
+        return vid ? get().serviceRecordsByVehicle[vid] || [] : [];
+      },
+
+      addHistoryReport: (report) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        const newReport: VehicleHistoryReport = {
+          ...report,
+          id: genId("rpt"),
+          added_at: new Date().toISOString(),
+        };
+        set((state) => ({
+          historyReportsByVehicle: {
+            ...state.historyReportsByVehicle,
+            [vid]: [newReport, ...(state.historyReportsByVehicle[vid] || [])],
+          },
+        }));
+      },
+
+      deleteHistoryReport: (id) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        set((state) => ({
+          historyReportsByVehicle: {
+            ...state.historyReportsByVehicle,
+            [vid]: (state.historyReportsByVehicle[vid] || []).filter((r) => r.id !== id),
+          },
+        }));
+      },
+
+      getHistoryReports: () => {
+        const vid = get().activeVehicleId;
+        return vid ? get().historyReportsByVehicle[vid] || [] : [];
+      },
+
+      addPendingItem: (item) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        const newItem: PendingItem = {
+          ...item,
+          resolved: item.resolved ?? false,
+          id: genId("pend"),
+          created_at: new Date().toISOString(),
+        };
+        set((state) => ({
+          pendingItemsByVehicle: {
+            ...state.pendingItemsByVehicle,
+            [vid]: [newItem, ...(state.pendingItemsByVehicle[vid] || [])],
+          },
+        }));
+      },
+
+      togglePendingItem: (id) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        set((state) => ({
+          pendingItemsByVehicle: {
+            ...state.pendingItemsByVehicle,
+            [vid]: (state.pendingItemsByVehicle[vid] || []).map((p) =>
+              p.id === id ? { ...p, resolved: !p.resolved } : p
+            ),
+          },
+        }));
+      },
+
+      deletePendingItem: (id) => {
+        const vid = get().activeVehicleId;
+        if (!vid) return;
+        set((state) => ({
+          pendingItemsByVehicle: {
+            ...state.pendingItemsByVehicle,
+            [vid]: (state.pendingItemsByVehicle[vid] || []).filter((p) => p.id !== id),
+          },
+        }));
+      },
+
+      getPendingItems: () => {
+        const vid = get().activeVehicleId;
+        return vid ? get().pendingItemsByVehicle[vid] || [] : [];
+      },
+
+      exportGarage: () => {
+        const s = get();
+        return {
+          schema: "car-inspect-garage",
+          version: 1,
+          exported_at: new Date().toISOString(),
+          activeVehicleId: s.activeVehicleId,
+          vehicles: s.garageVehicles,
+          serviceRecordsByVehicle: s.serviceRecordsByVehicle,
+          historyReportsByVehicle: s.historyReportsByVehicle,
+          pendingItemsByVehicle: s.pendingItemsByVehicle,
+        };
+      },
+
+      importGarage: (payload) => {
+        try {
+          const data = payload as Partial<GarageExport>;
+          if (!data || !Array.isArray(data.vehicles)) {
+            return { ok: false, error: "File does not contain a garage export." };
+          }
+          const vehicles = data.vehicles as VehicleProfile[];
+          // Merge imported vehicles into the existing garage (imported wins on id).
+          set((state) => {
+            const byId = new Map<string, VehicleProfile>();
+            for (const v of state.garageVehicles) byId.set(v.id, v);
+            for (const v of vehicles) byId.set(v.id, v);
+            const mergedVehicles = Array.from(byId.values());
+            const active =
+              vehicles[0]?.id || state.activeVehicleId || mergedVehicles[0]?.id || null;
+            const activeVehicle =
+              mergedVehicles.find((v) => v.id === active) || null;
+            return {
+              garageVehicles: mergedVehicles,
+              activeVehicleId: active,
+              vehicle: activeVehicle,
+              serviceRecordsByVehicle: {
+                ...state.serviceRecordsByVehicle,
+                ...(data.serviceRecordsByVehicle || {}),
+              },
+              historyReportsByVehicle: {
+                ...state.historyReportsByVehicle,
+                ...(data.historyReportsByVehicle || {}),
+              },
+              pendingItemsByVehicle: {
+                ...state.pendingItemsByVehicle,
+                ...(data.pendingItemsByVehicle || {}),
+              },
+              stations: INITIAL_STATIONS,
+              activeStationId: "station_1",
+            };
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "Import failed." };
+        }
       },
 
       updateVehicle: (patch) =>
@@ -816,7 +999,7 @@ export const useInspectionStore = create<InspectionState>()(
       },
     }),
     {
-      name: "car-inspect-store-v6",
+      name: "car-inspect-store-v7",
       storage: createJSONStorage(() => localStorage),
     }
   )

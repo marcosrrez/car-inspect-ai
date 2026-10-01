@@ -19,6 +19,9 @@ const EMPTY_FORM = {
   mileage: 0,
   asking_price: 0,
   vin: "",
+  owner_name: "",
+  location: "",
+  engine: "",
 };
 
 export const VehicleEditModal: React.FC = () => {
@@ -53,6 +56,9 @@ export const VehicleEditModal: React.FC = () => {
         mileage: vehicle.mileage || 0,
         asking_price: vehicle.asking_price || 0,
         vin: vehicle.vin || "",
+        owner_name: vehicle.owner_name || "",
+        location: vehicle.location || "",
+        engine: vehicle.engine || "",
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -255,6 +261,46 @@ export const VehicleEditModal: React.FC = () => {
               }
               className="w-full h-10 px-3 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
             />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Engine (optional)
+            </label>
+            <input
+              type="text"
+              value={formData.engine}
+              placeholder="e.g. 3.5L V6"
+              onChange={(e) => setFormData({ ...formData, engine: e.target.value })}
+              className="w-full h-10 px-3 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Owner (optional)
+              </label>
+              <input
+                type="text"
+                value={formData.owner_name}
+                placeholder="Your name"
+                onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
+                className="w-full h-10 px-3 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Location (optional)
+              </label>
+              <input
+                type="text"
+                value={formData.location}
+                placeholder="City, State"
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full h-10 px-3 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
+              />
+            </div>
           </div>
 
           {errorMsg && (

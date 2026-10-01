@@ -15,6 +15,8 @@ import {
   Plus,
   Bookmark,
   Trash2,
+  Download,
+  Upload,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
 
@@ -33,6 +35,8 @@ export const Navbar: React.FC = () => {
     getCompletedCount,
     getAllItems,
     savedHuntSnapshots,
+    exportGarage,
+    importGarage,
   } = useInspectionStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,6 +45,43 @@ export const Navbar: React.FC = () => {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const garageRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const data = exportGarage();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `car-inspect-garage-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-importing the same file
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        const res = importGarage(parsed);
+        if (!res.ok) {
+          alert(`Import failed: ${res.error || "invalid file"}`);
+        } else {
+          alert("Garage imported successfully.");
+        }
+      } catch {
+        alert("Import failed: that file isn't valid JSON.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -72,6 +113,13 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-zinc-200/70 transition-all">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={handleImportFile}
+      />
       <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Multi-Vehicle Garage Dropdown Selector */}
         <div className="relative" ref={garageRef}>
@@ -286,6 +334,29 @@ export const Navbar: React.FC = () => {
                 >
                   <Settings className="w-4 h-4 text-zinc-400" />
                   <span>Edit Vehicle Specs</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    importInputRef.current?.click();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition"
+                >
+                  <Upload className="w-4 h-4 text-zinc-400" />
+                  <span>Import Garage (.json)</span>
+                </button>
+
+                <button
+                  disabled={!vehicle}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleExport();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-zinc-50 text-xs text-zinc-700 flex items-center gap-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                >
+                  <Download className="w-4 h-4 text-zinc-400" />
+                  <span>Export / Back up Garage</span>
                 </button>
               </div>
 

@@ -23,16 +23,19 @@ import {
 import { useInspectionStore } from "../store/useInspectionStore";
 import { CAR_CARE_NUT_MAINTENANCE_TASKS } from "../utils/maintenanceDatabase";
 import { MaintenanceTask, ServiceRecord } from "../types/inspection";
+import { VehicleHistoryPanel } from "./VehicleHistoryPanel";
 
 export const GarageCareView: React.FC = () => {
   const {
     vehicle,
     updateVehicle,
-    serviceHistory,
+    getServiceHistory,
     addServiceRecord,
     deleteServiceRecord,
     setActiveTab,
   } = useInspectionStore();
+
+  const serviceHistory = getServiceHistory();
 
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -181,6 +184,9 @@ export const GarageCareView: React.FC = () => {
           Update Mileage
         </button>
       </div>
+
+      {/* Vehicle intelligence, history reports, pending items */}
+      <VehicleHistoryPanel />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">

@@ -29,7 +29,7 @@ export const InspectionReportModal: React.FC = () => {
     getTotalPoints,
     getCompletedCount,
     hasWalkAwayCondition,
-    serviceHistory,
+    getServiceHistory,
     resetChecklist,
   } = useInspectionStore();
 
@@ -38,6 +38,7 @@ export const InspectionReportModal: React.FC = () => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
 
+  const serviceHistory = getServiceHistory();
   const items = getAllItems();
   const completedCount = getCompletedCount();
   const totalScore = getTotalPoints();
