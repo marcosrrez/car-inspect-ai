@@ -14,6 +14,7 @@ import { VehicleEditModal } from "../components/VehicleEditModal";
 import { InspectionReportModal } from "../components/InspectionReportModal";
 import { ObdDecoderModal } from "../components/ObdDecoderModal";
 import { DocumentScanner } from "../components/DocumentScanner";
+import { AgentChat } from "../components/AgentChat";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { ChevronLeft, ChevronRight, FileText, Car, Plus } from "lucide-react";
 
@@ -176,6 +177,9 @@ export default function Home() {
         isOpen={obdModalOpen}
         onClose={() => setObdModalOpen(false)}
       />
+
+      {/* In-app conversational assistant (reads & updates the garage) */}
+      <AgentChat />
     </div>
   );
 }
