@@ -46,8 +46,8 @@ export async function POST(req: Request) {
       try {
         const run = client.messages.stream({
           model: MODEL,
-          max_tokens: 2048,
-          output_config: { effort: "low" },
+          max_tokens: 4096,
+          output_config: { effort: "high" },
           system,
           tools: AGENT_TOOLS as unknown as Anthropic.Tool[],
           messages: body.messages as Anthropic.MessageParam[],
