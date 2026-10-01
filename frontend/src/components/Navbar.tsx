@@ -19,6 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
+import { AuthSyncControls } from "./AuthSyncControls";
 
 export const Navbar: React.FC = () => {
   const {
@@ -268,7 +269,9 @@ export const Navbar: React.FC = () => {
           </button>
         </div>
 
-        {/* Right Menu (•••) */}
+        {/* Cloud sync + Right Menu (•••) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+        <AuthSyncControls />
         <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -378,6 +381,7 @@ export const Navbar: React.FC = () => {
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
     </header>
