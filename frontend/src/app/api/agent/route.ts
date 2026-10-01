@@ -37,24 +37,51 @@ export async function POST(req: Request) {
   }`;
 
   const client = new Anthropic();
-  try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      output_config: { effort: "low" },
-      system,
-      tools: AGENT_TOOLS as unknown as Anthropic.Tool[],
-      messages: body.messages as Anthropic.MessageParam[],
-    });
-    return Response.json({
-      content: response.content,
-      stop_reason: response.stop_reason,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Assistant error.";
-    const status = err instanceof Anthropic.APIError && err.status ? err.status : 500;
-    return Response.json({ error: message }, { status });
-  }
+  const encoder = new TextEncoder();
+  const sse = (event: string, data: unknown) =>
+    encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const run = client.messages.stream({
+          model: MODEL,
+          max_tokens: 2048,
+          output_config: { effort: "low" },
+          system,
+          tools: AGENT_TOOLS as unknown as Anthropic.Tool[],
+          messages: body.messages as Anthropic.MessageParam[],
+        });
+
+        for await (const event of run) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            controller.enqueue(sse("delta", { text: event.delta.text }));
+          }
+        }
+
+        const final = await run.finalMessage();
+        controller.enqueue(
+          sse("final", { content: final.content, stop_reason: final.stop_reason })
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Assistant error.";
+        controller.enqueue(sse("error", { message }));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 interface AgentBody {

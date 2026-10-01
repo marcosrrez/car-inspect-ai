@@ -1,26 +1,42 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, Send, X, Check, RefreshCw } from "lucide-react";
+import {
+  Sparkles,
+  ArrowUp,
+  ArrowLeft,
+  Plus,
+  Mic,
+  Check,
+  SquarePen,
+  FileText,
+  X,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { isWriteTool } from "../lib/agentTools";
+import { ingestDocument } from "../utils/apiClient";
+import { DocumentExtraction } from "../types/inspection";
 
-// A staged (unconfirmed) write the user applies with one tap.
 interface StagedAction {
   id: string;
   kind: string;
   summary: string;
   applied: boolean;
   data: Record<string, unknown>;
+  extraction?: DocumentExtraction;
 }
 
-interface DisplayMsg {
+interface Msg {
+  id: string;
   role: "user" | "assistant";
   text: string;
+  streaming?: boolean;
+  attachment?: string;
   staged?: StagedAction[];
 }
 
-// Loose content-block shape (mirrors Anthropic message blocks we care about).
 interface Block {
   type: string;
   text?: string;
@@ -29,35 +45,100 @@ interface Block {
   input?: Record<string, unknown>;
 }
 
-const uid = () => `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+const uid = () => `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+const GREETING =
+  "Hi — I'm your garage assistant. Tell me what you did to the car, drop in a Carfax or invoice, ask what's overdue, or add a vehicle. I'll take care of the filing.";
 
 export const AgentChat: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msgs, setMsgs] = useState<DisplayMsg[]>([
-    {
-      role: "assistant",
-      text:
-        "Hi! I'm your garage assistant. Tell me what you did to the car, ask what's overdue, add a vehicle, or anything else — I'll handle it.",
-    },
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([
+    { id: uid(), role: "assistant", text: GREETING },
   ]);
-  // Raw conversation sent to the model (text + tool_use/tool_result blocks).
+
   const apiMsgs = useRef<Array<{ role: string; content: unknown }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Optional voice-to-text (Web Speech API), only where supported.
+  const [micSupported, setMicSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+
+  useEffect(() => {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => never;
+      webkitSpeechRecognition?: new () => never;
+    };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) return;
+    setMicSupported(true);
+    const rec = new (SR as unknown as { new (): {
+      lang: string;
+      interimResults: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onend: () => void;
+      start: () => void;
+      stop: () => void;
+    } })();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const t = Array.from(e.results).map((r) => r[0].transcript).join(" ");
+      setInput((prev) => (prev ? prev + " " : "") + t);
+    };
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+  }, []);
+
+  const toggleMic = () => {
+    const rec = recognitionRef.current;
+    if (!rec) return;
+    if (listening) {
+      rec.stop();
+      setListening(false);
+    } else {
+      try {
+        rec.start();
+        setListening(true);
+      } catch {
+        setListening(false);
+      }
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, busy]);
 
+  // auto-grow textarea
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "0px";
+    ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
+  }, [input]);
+
+  const patchMsg = (id: string, patch: Partial<Msg> | ((m: Msg) => Partial<Msg>)) =>
+    setMsgs((p) =>
+      p.map((m) => (m.id === id ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m))
+    );
+
+  const newChat = () => {
+    apiMsgs.current = [];
+    setMsgs([{ id: uid(), role: "assistant", text: GREETING }]);
+  };
+
+  // ---- store-backed tool execution ----
   const buildContext = (): string => {
     const s = useInspectionStore.getState();
     const v = s.vehicle;
     return JSON.stringify({
       active_vehicle: v
-        ? `${v.year} ${v.make} ${v.model} ${v.trim || ""} — ${(v.mileage || 0).toLocaleString()} mi${
-            v.vin ? ` — VIN ${v.vin}` : ""
-          }`
+        ? `${v.year} ${v.make} ${v.model} ${v.trim || ""} — ${(v.mileage || 0).toLocaleString()} mi`
         : null,
       vehicles: s.garageVehicles.map((x) => `${x.year} ${x.make} ${x.model}`),
       open_pending: s.getPendingItems().filter((p) => !p.resolved).map((p) => p.title),
@@ -90,7 +171,6 @@ export const AgentChat: React.FC = () => {
           verdict: h.verdict,
           recommended_offer_usd: h.recommended_offer_usd,
         }));
-      case "get_overview":
       default:
         return JSON.parse(buildContext());
     }
@@ -99,21 +179,12 @@ export const AgentChat: React.FC = () => {
   const toStaged = (name: string, input: Record<string, unknown>): StagedAction | null => {
     if (name === "complete_pending_item") {
       const q = String(input.query || "").toLowerCase();
-      const openItems = useInspectionStore
-        .getState()
-        .getPendingItems()
-        .filter((p) => !p.resolved);
+      const openItems = useInspectionStore.getState().getPendingItems().filter((p) => !p.resolved);
       const match =
         openItems.find((p) => p.title.toLowerCase().includes(q)) ||
         openItems.find((p) => q.includes(p.title.toLowerCase().slice(0, 8)));
       if (!match) return null;
-      return {
-        id: uid(),
-        kind: name,
-        summary: `Mark done: ${match.title}`,
-        applied: false,
-        data: { itemId: match.id, title: match.title },
-      };
+      return { id: uid(), kind: name, summary: `Mark done: ${match.title}`, applied: false, data: { itemId: match.id } };
     }
     const summaries: Record<string, string> = {
       add_service_record: `Log service: ${input.title}`,
@@ -125,11 +196,14 @@ export const AgentChat: React.FC = () => {
     return { id: uid(), kind: name, summary: summaries[name] || name, applied: false, data: input };
   };
 
-  const applyAction = (a: StagedAction) => {
+  const applyAction = (msgId: string, a: StagedAction) => {
     const s = useInspectionStore.getState();
     const d = a.data;
     const today = new Date().toISOString().slice(0, 10);
     switch (a.kind) {
+      case "apply_extraction":
+        if (a.extraction) s.applyExtraction(a.extraction, { applyVehicleFields: true });
+        break;
       case "add_service_record":
         s.addServiceRecord({
           task_id: (d.task_id as string) || "general_service",
@@ -181,97 +255,168 @@ export const AgentChat: React.FC = () => {
         });
         break;
     }
-    setMsgs((prev) =>
-      prev.map((m) =>
-        m.staged
-          ? { ...m, staged: m.staged.map((x) => (x.id === a.id ? { ...x, applied: true } : x)) }
-          : m
-      )
-    );
+    patchMsg(msgId, (m) => ({
+      staged: m.staged?.map((x) => (x.id === a.id ? { ...x, applied: true } : x)),
+    }));
+  };
+
+  // ---- one streamed (or mock-JSON) model turn ----
+  const streamTurn = async (
+    liveId: string
+  ): Promise<{ content: Block[]; stop_reason: string }> => {
+    const res = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: apiMsgs.current, context: buildContext() }),
+    });
+    if (!res.ok) {
+      let msg = `Assistant error (${res.status}).`;
+      try {
+        const b = await res.json();
+        if (b?.error) msg = b.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg);
+    }
+
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("text/event-stream") || !res.body) {
+      const data = await res.json(); // mock path
+      if (data.error) throw new Error(data.error);
+      const text = (data.content || [])
+        .filter((b: Block) => b.type === "text")
+        .map((b: Block) => b.text)
+        .join("\n");
+      if (text) patchMsg(liveId, { text });
+      return { content: data.content || [], stop_reason: data.stop_reason };
+    }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let final: { content: Block[]; stop_reason: string } | null = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let ev = "message";
+        let data = "";
+        for (const line of chunk.split("\n")) {
+          if (line.startsWith("event:")) ev = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+        }
+        if (!data) continue;
+        const parsed = JSON.parse(data);
+        if (ev === "delta") {
+          patchMsg(liveId, (m) => ({ text: m.text + parsed.text }));
+        } else if (ev === "final") {
+          final = parsed;
+        } else if (ev === "error") {
+          throw new Error(parsed.message || "Assistant error.");
+        }
+      }
+    }
+    if (!final) throw new Error("No response from assistant.");
+    return final;
+  };
+
+  const runAgent = async () => {
+    for (let i = 0; i < 5; i++) {
+      const liveId = uid();
+      setMsgs((p) => [...p, { id: liveId, role: "assistant", text: "", streaming: true }]);
+      let final: { content: Block[]; stop_reason: string };
+      try {
+        final = await streamTurn(liveId);
+      } catch (e) {
+        patchMsg(liveId, { streaming: false, text: e instanceof Error ? e.message : "Something went wrong." });
+        return;
+      }
+      const content = final.content || [];
+      apiMsgs.current.push({ role: "assistant", content });
+
+      const staged: StagedAction[] = [];
+      const toolResults: Array<Record<string, unknown>> = [];
+      for (const b of content) {
+        if (b.type !== "tool_use" || !b.name) continue;
+        if (isWriteTool(b.name)) {
+          const a = toStaged(b.name, b.input || {});
+          if (a) {
+            staged.push(a);
+            toolResults.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify({ status: "staged", summary: a.summary }) });
+          } else {
+            toolResults.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify({ status: "not_found" }) });
+          }
+        } else {
+          toolResults.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(runRead(b.name)) });
+        }
+      }
+
+      patchMsg(liveId, (m) => ({
+        streaming: false,
+        staged: staged.length ? staged : undefined,
+        text: m.text || "",
+      }));
+
+      if (final.stop_reason === "tool_use" && toolResults.length) {
+        apiMsgs.current.push({ role: "user", content: toolResults });
+        continue;
+      }
+      return;
+    }
+  };
+
+  const handleAttachment = async (file: File, note: string) => {
+    const userText = note || "Here's a document for my garage.";
+    setMsgs((p) => [...p, { id: uid(), role: "user", text: userText, attachment: file.name }]);
+    const liveId = uid();
+    setMsgs((p) => [...p, { id: liveId, role: "assistant", text: "", streaming: true }]);
+    try {
+      const ex = await ingestDocument(file, useInspectionStore.getState().vehicle);
+      const parts = [
+        ex.service_records?.length ? `${ex.service_records.length} completed service item(s)` : null,
+        ex.pending_items?.length ? `${ex.pending_items.length} recommendation(s)` : null,
+        ex.history_report ? "a history report" : null,
+      ].filter(Boolean);
+      const summary =
+        `I read your ${ex.document_type.toLowerCase()}` +
+        (ex.summary ? ` — ${ex.summary}` : ".") +
+        (parts.length ? `\n\nReady to file: ${parts.join(", ")}.` : "") +
+        "\n\nTap **Apply** to add it to your garage.";
+      const staged: StagedAction = {
+        id: uid(),
+        kind: "apply_extraction",
+        summary: "File everything from this document",
+        applied: false,
+        data: {},
+        extraction: ex,
+      };
+      patchMsg(liveId, { streaming: false, text: summary, staged: [staged] });
+    } catch (e) {
+      patchMsg(liveId, { streaming: false, text: e instanceof Error ? e.message : "Couldn't read that document." });
+    }
   };
 
   const send = async () => {
+    if (busy) return;
     const text = input.trim();
-    if (!text || busy) return;
+    const file = pendingFile;
+    if (!text && !file) return;
     setInput("");
-    setMsgs((p) => [...p, { role: "user", text }]);
-    apiMsgs.current.push({ role: "user", content: text });
+    setPendingFile(null);
     setBusy(true);
     try {
-      for (let i = 0; i < 5; i++) {
-        const res = await fetch("/api/agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMsgs.current, context: buildContext() }),
-        });
-        if (!res.ok) {
-          let msg = `Assistant error (${res.status}).`;
-          try {
-            const b = await res.json();
-            if (b?.error) msg = b.error;
-          } catch {
-            /* ignore */
-          }
-          setMsgs((p) => [...p, { role: "assistant", text: msg }]);
-          break;
-        }
-        const data = await res.json();
-        const content: Block[] = data.content || [];
-        apiMsgs.current.push({ role: "assistant", content });
-
-        const text2 = content
-          .filter((b) => b.type === "text")
-          .map((b) => b.text || "")
-          .join("\n")
-          .trim();
-
-        const staged: StagedAction[] = [];
-        const toolResults: Array<Record<string, unknown>> = [];
-        for (const b of content) {
-          if (b.type !== "tool_use" || !b.name) continue;
-          if (isWriteTool(b.name)) {
-            const a = toStaged(b.name, b.input || {});
-            if (a) {
-              staged.push(a);
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: b.id,
-                content: JSON.stringify({ status: "staged", summary: a.summary }),
-              });
-            } else {
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: b.id,
-                content: JSON.stringify({ status: "not_found" }),
-              });
-            }
-          } else {
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: b.id,
-              content: JSON.stringify(runRead(b.name)),
-            });
-          }
-        }
-
-        if (text2 || staged.length) {
-          setMsgs((p) => [
-            ...p,
-            { role: "assistant", text: text2, staged: staged.length ? staged : undefined },
-          ]);
-        }
-
-        if (data.stop_reason === "tool_use" && toolResults.length) {
-          apiMsgs.current.push({ role: "user", content: toolResults });
-          continue;
-        }
-        break;
+      if (file) {
+        await handleAttachment(file, text);
+      } else {
+        setMsgs((p) => [...p, { id: uid(), role: "user", text }]);
+        apiMsgs.current.push({ role: "user", content: text });
+        await runAgent();
       }
-    } catch (err) {
-      setMsgs((p) => [
-        ...p,
-        { role: "assistant", text: err instanceof Error ? err.message : "Something went wrong." },
-      ]);
     } finally {
       setBusy(false);
     }
@@ -279,7 +424,6 @@ export const AgentChat: React.FC = () => {
 
   return (
     <>
-      {/* Floating launcher */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -290,99 +434,169 @@ export const AgentChat: React.FC = () => {
         </button>
       )}
 
-      {/* Chat panel */}
       {open && (
-        <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-5 sm:right-5 z-[60] w-full sm:w-[400px] h-[80vh] sm:h-[600px] bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl border border-zinc-200/80 flex flex-col animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] bg-[#1a1a1a] text-zinc-100 flex flex-col sm:inset-auto sm:bottom-5 sm:right-5 sm:w-[420px] sm:h-[680px] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-zinc-800 sm:shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-100 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-sm font-bold text-zinc-900 leading-none">Assistant</div>
-                <div className="text-[10px] text-zinc-400 mt-0.5">Reads & updates your garage</div>
-              </div>
-            </div>
+          <div className="h-14 shrink-0 flex items-center justify-between px-3 border-b border-zinc-800/80">
             <button
               onClick={() => setOpen(false)}
-              className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-400 hover:text-zinc-900 flex items-center justify-center transition"
+              className="w-9 h-9 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-300 transition"
               aria-label="Close assistant"
             >
-              <X className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="text-center leading-tight">
+              <div className="text-sm font-semibold text-zinc-100">Assistant</div>
+              <div className="text-[11px] text-zinc-500">car-inspect-ai</div>
+            </div>
+            <button
+              onClick={newChat}
+              className="w-9 h-9 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-300 transition"
+              aria-label="New chat"
+            >
+              <SquarePen className="w-[18px] h-[18px]" />
             </button>
           </div>
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {msgs.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div className="max-w-[85%] space-y-2">
-                  {m.text && (
-                    <div
-                      className={`px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
-                        m.role === "user"
-                          ? "bg-zinc-900 text-white rounded-br-md"
-                          : "bg-zinc-100 text-zinc-800 rounded-bl-md"
-                      }`}
-                    >
-                      {m.text}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
+            {msgs.map((m) =>
+              m.role === "user" ? (
+                <div key={m.id} className="flex justify-end">
+                  <div className="max-w-[85%] space-y-1.5">
+                    {m.attachment && (
+                      <div className="ml-auto w-fit flex items-center gap-2 px-3 py-2 rounded-2xl bg-zinc-800 border border-zinc-700 text-xs text-zinc-300">
+                        <FileText className="w-4 h-4 text-orange-400 shrink-0" />
+                        <span className="truncate max-w-[180px]">{m.attachment}</span>
+                      </div>
+                    )}
+                    {m.text && (
+                      <div className="px-4 py-2.5 rounded-3xl rounded-br-lg bg-zinc-800 text-[15px] leading-relaxed text-zinc-100">
+                        {m.text}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div key={m.id} className="space-y-3">
+                  <div className="flex gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-orange-500/90 text-white flex items-center justify-center shrink-0 mt-0.5">
+                      <Sparkles className="w-4 h-4" />
                     </div>
-                  )}
-                  {m.staged?.map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex items-center justify-between gap-2 p-2.5 rounded-2xl border border-orange-200/70 bg-orange-50/60 text-xs"
-                    >
-                      <span className="font-semibold text-zinc-800 min-w-0 truncate">{a.summary}</span>
-                      {a.applied ? (
-                        <span className="shrink-0 inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                          <Check className="w-3.5 h-3.5" /> Applied
-                        </span>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      {m.text ? (
+                        <div className="agent-prose text-[15px] leading-relaxed text-zinc-100">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                          {m.streaming && <span className="agent-caret" />}
+                        </div>
                       ) : (
-                        <button
-                          onClick={() => applyAction(a)}
-                          className="shrink-0 h-7 px-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold transition"
-                        >
-                          Apply
-                        </button>
+                        <div className="flex gap-1 pt-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:-0.3s]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:-0.15s]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
+                        </div>
                       )}
                     </div>
-                  ))}
+                  </div>
+                  {m.staged && m.staged.length > 0 && (
+                    <div className="ml-9 space-y-1.5">
+                      {m.staged.map((a) => (
+                        <div
+                          key={a.id}
+                          className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-2xl bg-zinc-800/80 border border-zinc-700/70 text-sm"
+                        >
+                          <span className="text-zinc-200 min-w-0 truncate">{a.summary}</span>
+                          {a.applied ? (
+                            <span className="shrink-0 inline-flex items-center gap-1 text-emerald-400 text-xs font-semibold">
+                              <Check className="w-4 h-4" /> Applied
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => applyAction(m.id, a)}
+                              className="shrink-0 h-8 px-4 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition active:scale-95"
+                            >
+                              Apply
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-            {busy && (
-              <div className="flex justify-start">
-                <div className="px-3.5 py-2.5 rounded-2xl bg-zinc-100 text-zinc-400 flex items-center gap-2 text-xs">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Thinking…
-                </div>
-              </div>
+              )
             )}
           </div>
 
-          {/* Input */}
-          <div className="p-3 border-t border-zinc-100 shrink-0 flex items-center gap-2">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="Message your assistant…"
-              className="flex-1 h-11 px-3.5 rounded-xl border border-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-            />
-            <button
-              onClick={send}
-              disabled={busy || !input.trim()}
-              className="h-11 w-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition"
-              aria-label="Send"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+          {/* Composer */}
+          <div className="shrink-0 px-3 pb-4 pt-1">
+            {pendingFile && (
+              <div className="mb-2 flex items-center gap-2 w-fit max-w-full px-3 py-2 rounded-2xl bg-zinc-800 border border-zinc-700 text-xs text-zinc-300">
+                <FileText className="w-4 h-4 text-orange-400 shrink-0" />
+                <span className="truncate max-w-[200px]">{pendingFile.name}</span>
+                <button onClick={() => setPendingFile(null)} className="text-zinc-500 hover:text-zinc-200">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            <div className="rounded-[26px] bg-zinc-800/70 border border-zinc-700/60 px-2.5 py-2">
+              <textarea
+                ref={taRef}
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder="Message your assistant…"
+                className="w-full resize-none bg-transparent px-2 pt-1.5 pb-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+              />
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) setPendingFile(f);
+                  }}
+                />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="w-9 h-9 rounded-full bg-zinc-700/70 hover:bg-zinc-700 text-zinc-200 flex items-center justify-center transition shrink-0"
+                  aria-label="Attach document"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+                <div className="flex-1" />
+                {micSupported && (
+                  <button
+                    onClick={toggleMic}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition shrink-0 ${
+                      listening
+                        ? "bg-orange-500/20 text-orange-400"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                    aria-label={listening ? "Stop voice input" : "Start voice input"}
+                  >
+                    <Mic className={`w-5 h-5 ${listening ? "animate-pulse" : ""}`} />
+                  </button>
+                )}
+                <button
+                  onClick={send}
+                  disabled={busy || (!input.trim() && !pendingFile)}
+                  className="w-9 h-9 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition shrink-0 disabled:opacity-40 active:scale-95"
+                  aria-label="Send"
+                >
+                  <ArrowUp className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
