@@ -17,6 +17,7 @@ import remarkGfm from "remark-gfm";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { isWriteTool } from "../lib/agentTools";
 import { compressImage } from "../utils/imageCompression";
+import { computeInsights, suggestedPrompts } from "../lib/garageInsights";
 
 interface StagedAction {
   id: string;
@@ -72,17 +73,16 @@ interface Block {
 }
 
 const uid = () => `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-const GREETING =
-  "Hi — I'm your garage assistant. Tell me what you did to the car, drop in a Carfax or invoice, ask what's overdue, or add a vehicle. I'll take care of the filing.";
 
 export const AgentChat: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [msgs, setMsgs] = useState<Msg[]>([
-    { id: uid(), role: "assistant", text: GREETING },
-  ]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+
+  // Reactive urgent count for the launcher badge (overdue + high-priority to-dos).
+  const urgentCount = useInspectionStore((s) => computeInsights(s).urgentCount);
 
   const apiMsgs = useRef<Array<{ role: string; content: unknown }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -153,26 +153,28 @@ export const AgentChat: React.FC = () => {
       p.map((m) => (m.id === id ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m))
     );
 
+  const briefingMsg = (): Msg => ({
+    id: uid(),
+    role: "assistant",
+    text: computeInsights(useInspectionStore.getState()).briefing,
+  });
+
   const newChat = () => {
     apiMsgs.current = [];
-    setMsgs([{ id: uid(), role: "assistant", text: GREETING }]);
+    setMsgs([briefingMsg()]);
   };
 
+  // Open the panel with a fresh, data-driven briefing (free, instant).
+  useEffect(() => {
+    if (open && apiMsgs.current.length === 0) {
+      setMsgs([briefingMsg()]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // ---- store-backed tool execution ----
-  const buildContext = (): string => {
-    const s = useInspectionStore.getState();
-    const v = s.vehicle;
-    return JSON.stringify({
-      active_vehicle: v
-        ? `${v.year} ${v.make} ${v.model} ${v.trim || ""} — ${(v.mileage || 0).toLocaleString()} mi`
-        : null,
-      vehicles: s.garageVehicles.map((x) => `${x.year} ${x.make} ${x.model}`),
-      open_pending: s.getPendingItems().filter((p) => !p.resolved).map((p) => p.title),
-      service_count: s.getServiceHistory().length,
-      report_count: s.getHistoryReports().length,
-      hunt_count: s.savedHuntSnapshots.length,
-    });
-  };
+  const buildContext = (): string =>
+    computeInsights(useInspectionStore.getState()).contextText;
 
   const runRead = (name: string): unknown => {
     const s = useInspectionStore.getState();
@@ -412,6 +414,22 @@ export const AgentChat: React.FC = () => {
     }
   };
 
+  const runUserTurn = async (
+    apiContent: unknown,
+    displayText: string,
+    attachmentName?: string
+  ) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setMsgs((p) => [...p, { id: uid(), role: "user", text: displayText, attachment: attachmentName }]);
+      apiMsgs.current.push({ role: "user", content: apiContent });
+      await runAgent();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const send = async () => {
     if (busy) return;
     const text = input.trim();
@@ -419,43 +437,36 @@ export const AgentChat: React.FC = () => {
     if (!text && !file) return;
     setInput("");
     setPendingFile(null);
-    setBusy(true);
-    try {
-      // Show the user's turn (text + any attachment).
-      setMsgs((p) => [
-        ...p,
-        { id: uid(), role: "user", text, attachment: file?.name },
-      ]);
 
-      if (file) {
-        let block: Block;
-        try {
-          block = await fileToBlock(file);
-        } catch {
-          setMsgs((p) => [
-            ...p,
-            { id: uid(), role: "assistant", text: "I couldn't read that file — try a PDF or a clear photo." },
-          ]);
-          return;
-        }
-        // Send the document AND the user's words together, as one turn, so the
-        // model reasons over both (reconciling, capturing what the user said).
-        const prompt =
-          text ||
-          "Here's a document for my garage. Read it, reconcile it with everything I've told you, and update my records.";
-        apiMsgs.current.push({
-          role: "user",
-          content: [block, { type: "text", text: prompt }] as unknown,
-        });
-      } else {
-        apiMsgs.current.push({ role: "user", content: text });
+    if (file) {
+      let block: Block;
+      try {
+        block = await fileToBlock(file);
+      } catch {
+        setMsgs((p) => [
+          ...p,
+          { id: uid(), role: "assistant", text: "I couldn't read that file — try a PDF or a clear photo." },
+        ]);
+        return;
       }
-
-      await runAgent();
-    } finally {
-      setBusy(false);
+      // Send the document AND the user's words together, as one turn.
+      const prompt =
+        text ||
+        "Here's a document for my garage. Read it, reconcile it with everything I've told you, and update my records.";
+      await runUserTurn([block, { type: "text", text: prompt }], text, file.name);
+    } else {
+      await runUserTurn(text, text);
     }
   };
+
+  const askSuggestion = (t: string) => {
+    if (busy) return;
+    runUserTurn(t, t);
+  };
+
+  const insights = computeInsights(useInspectionStore.getState());
+  const showSuggestions = open && !busy && msgs.length <= 1;
+  const suggestions = suggestedPrompts(insights);
 
   return (
     <>
@@ -463,9 +474,14 @@ export const AgentChat: React.FC = () => {
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-5 right-5 z-[60] h-14 w-14 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition"
-          aria-label="Open assistant"
+          aria-label={urgentCount > 0 ? `Assistant — ${urgentCount} need attention` : "Open assistant"}
         >
           <Sparkles className="w-6 h-6" />
+          {urgentCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center border-2 border-[#F8F9FA]">
+              {urgentCount > 9 ? "9+" : urgentCount}
+            </span>
+          )}
         </button>
       )}
 
@@ -561,6 +577,21 @@ export const AgentChat: React.FC = () => {
               )
             )}
           </div>
+
+          {/* Suggested next steps */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="shrink-0 px-3 pb-1 flex flex-wrap gap-2">
+              {suggestions.map((sug) => (
+                <button
+                  key={sug}
+                  onClick={() => askSuggestion(sug)}
+                  className="px-3 py-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/70 text-zinc-200 text-xs transition"
+                >
+                  {sug}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Composer */}
           <div className="shrink-0 px-3 pb-4 pt-1">
