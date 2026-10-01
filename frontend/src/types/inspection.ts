@@ -102,6 +102,23 @@ export interface Station {
   items: ChecklistItem[];
 }
 
+export interface OwnershipRecord {
+  id: string;
+  label: string;        // e.g. "Owner 1 (2015–2022)"
+  period?: string;
+  location?: string;
+  annual_miles?: number;
+  usage_notes?: string;
+}
+
+export interface AccidentRecord {
+  id: string;
+  date?: string;
+  description: string;
+  damage_location?: string;
+  airbags_deployed?: boolean;
+}
+
 export interface VehicleProfile {
   id: string;
   year: number;
@@ -112,6 +129,46 @@ export interface VehicleProfile {
   asking_price: number;
   vin: string;
   is_turbocharged?: boolean;
+
+  // Extended intelligence (all optional, populated via edit or import)
+  nickname?: string;
+  owner_name?: string;
+  location?: string;
+  engine?: string;
+  transmission?: string;
+  drivetrain?: string;
+  purchase_dealer?: string;
+  service_center?: string;
+  ownership_count?: number;
+  ownership_history?: OwnershipRecord[];
+  accident_history?: AccidentRecord[];
+  notes?: string;
+}
+
+export type HistoryReportProvider = "carfax" | "autocheck" | "other";
+
+export interface VehicleHistoryReport {
+  id: string;
+  provider: HistoryReportProvider;
+  report_date?: string;
+  url?: string;
+  owners_reported?: number;
+  accidents_reported?: number;
+  title_brand?: string;       // e.g. "Clean", "Salvage"
+  summary?: string;
+  added_at: string;
+}
+
+export type PendingPriority = "high" | "medium" | "low";
+
+export interface PendingItem {
+  id: string;
+  title: string;
+  priority: PendingPriority;
+  estimated_cost_usd?: number;
+  notes?: string;
+  resolved: boolean;
+  created_at: string;
 }
 
 export interface ServiceRecord {
@@ -124,6 +181,18 @@ export interface ServiceRecord {
   performed_by: "diy" | "professional";
   parts_brand?: string;
   notes?: string;
+}
+
+// Full export/import payload for the local-first garage.
+export interface GarageExport {
+  schema: "car-inspect-garage";
+  version: number;
+  exported_at: string;
+  activeVehicleId: string | null;
+  vehicles: VehicleProfile[];
+  serviceRecordsByVehicle: Record<string, ServiceRecord[]>;
+  historyReportsByVehicle: Record<string, VehicleHistoryReport[]>;
+  pendingItemsByVehicle: Record<string, PendingItem[]>;
 }
 
 export interface MaintenanceTask {
