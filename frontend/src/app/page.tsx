@@ -13,6 +13,7 @@ import { WalkAwayModal } from "../components/WalkAwayModal";
 import { VehicleEditModal } from "../components/VehicleEditModal";
 import { InspectionReportModal } from "../components/InspectionReportModal";
 import { ObdDecoderModal } from "../components/ObdDecoderModal";
+import { DocumentScanner } from "../components/DocumentScanner";
 import { useInspectionStore } from "../store/useInspectionStore";
 import { ChevronLeft, ChevronRight, FileText, Car, Plus } from "lucide-react";
 
@@ -89,15 +90,19 @@ export default function Home() {
               by adding a vehicle — enter a VIN to auto-fill, or type the details
               in manually.
             </p>
-            <button
-              onClick={() => openVehicleModal("add")}
-              className="mt-6 h-12 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] text-white text-sm font-semibold shadow-sm transition flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add a Vehicle</span>
-            </button>
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                onClick={() => openVehicleModal("add")}
+                className="h-12 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] text-white text-sm font-semibold shadow-sm transition flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add a Vehicle</span>
+              </button>
+              <DocumentScanner variant="primary" label="Scan a Carfax or invoice" />
+            </div>
             <p className="text-[11px] text-zinc-400 mt-4">
-              Everything stays on this device.
+              Scanning a document can create the vehicle for you. Everything stays on this device
+              unless you turn on sync.
             </p>
           </div>
         ) : activeTab === "inspection" ? (

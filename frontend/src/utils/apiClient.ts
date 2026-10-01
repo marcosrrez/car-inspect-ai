@@ -4,7 +4,34 @@ import {
   OverallReportSummary,
   VehicleProfile,
   ChecklistItem,
+  DocumentExtraction,
 } from "../types/inspection";
+
+export async function ingestDocument(
+  file: File,
+  vehicle?: VehicleProfile | null
+): Promise<DocumentExtraction> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (vehicle) {
+    formData.append(
+      "vehicle",
+      `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim || ""} VIN ${vehicle.vin || "n/a"}`.trim()
+    );
+  }
+  const res = await fetch("/api/ingest", { method: "POST", body: formData });
+  if (!res.ok) {
+    let msg = `Document scan failed (${res.status}).`;
+    try {
+      const body = await res.json();
+      if (body?.error) msg = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as DocumentExtraction;
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "/api/v1";
