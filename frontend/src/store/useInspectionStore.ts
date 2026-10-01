@@ -13,6 +13,7 @@ import {
   VehicleHistoryReport,
   PendingItem,
   GarageExport,
+  DocumentExtraction,
 } from "../types/inspection";
 
 function genId(prefix: string): string {
@@ -490,6 +491,12 @@ interface InspectionState {
   exportGarage: () => GarageExport;
   importGarage: (payload: unknown) => { ok: boolean; error?: string };
 
+  // Apply an AI document extraction (already filtered to the user's selections)
+  applyExtraction: (
+    ex: DocumentExtraction,
+    opts?: { applyVehicleFields?: boolean }
+  ) => { ok: boolean; error?: string };
+
   // Car Hunt Archive & Snapshots
   savedHuntSnapshots: SavedInspectionSnapshot[];
   saveCurrentInspectionSnapshot: (sellerInfo?: {
@@ -873,6 +880,138 @@ export const useInspectionStore = create<InspectionState>()(
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : "Import failed." };
         }
+      },
+
+      applyExtraction: (ex, opts) => {
+        const applyVehicleFields = opts?.applyVehicleFields ?? true;
+        let vehId = get().activeVehicleId;
+        const exV = ex.vehicle || {};
+
+        if (!vehId) {
+          if (!exV.make || !exV.model) {
+            return {
+              ok: false,
+              error:
+                "No active vehicle, and the document didn't include a make/model. Add a vehicle first.",
+            };
+          }
+          const newV: VehicleProfile = {
+            id: genId("veh"),
+            year: exV.year || new Date().getFullYear(),
+            make: exV.make,
+            model: exV.model,
+            trim: exV.trim || "",
+            mileage: exV.mileage || 0,
+            asking_price: 0,
+            vin: exV.vin || "",
+            is_turbocharged: false,
+            engine: exV.engine,
+            transmission: exV.transmission,
+            owner_name: exV.owner_name,
+            location: exV.location,
+            service_center: exV.service_center,
+            ownership_history: ex.ownership_history || [],
+            accident_history: ex.accident_history || [],
+          };
+          set((state) => ({
+            garageVehicles: [newV, ...state.garageVehicles],
+            activeVehicleId: newV.id,
+            vehicle: newV,
+            stations: INITIAL_STATIONS,
+            activeStationId: "station_1",
+          }));
+          vehId = newV.id;
+        } else if (applyVehicleFields) {
+          set((state) => {
+            const cur = state.vehicle;
+            if (!cur) return {};
+            const patch: Partial<VehicleProfile> = {};
+            for (const k of [
+              "vin",
+              "engine",
+              "transmission",
+              "owner_name",
+              "location",
+              "service_center",
+              "trim",
+            ] as const) {
+              if (exV[k]) (patch[k] as string) = exV[k] as string;
+            }
+            if (exV.mileage && exV.mileage > (cur.mileage || 0)) patch.mileage = exV.mileage;
+            const newOwn = [...(cur.ownership_history || []), ...(ex.ownership_history || [])];
+            const newAcc = [...(cur.accident_history || []), ...(ex.accident_history || [])];
+            const updated: VehicleProfile = {
+              ...cur,
+              ...patch,
+              ownership_history: newOwn,
+              accident_history: newAcc,
+            };
+            return {
+              vehicle: updated,
+              garageVehicles: state.garageVehicles.map((v) =>
+                v.id === updated.id ? updated : v
+              ),
+            };
+          });
+        }
+
+        const id = vehId as string;
+        const today = new Date().toISOString().slice(0, 10);
+        const curMiles = get().vehicle?.mileage || 0;
+
+        const newServices: ServiceRecord[] = (ex.service_records || []).map((r) => ({
+          id: genId("srv"),
+          task_id: r.task_id || "general_service",
+          title: r.title,
+          date: r.date || today,
+          mileage: r.mileage ?? curMiles,
+          cost_usd: r.cost_usd ?? 0,
+          performed_by: r.performed_by || "professional",
+          parts_brand: r.parts_brand,
+          notes: r.notes,
+        }));
+
+        const newPending: PendingItem[] = (ex.pending_items || []).map((p) => ({
+          id: genId("pend"),
+          title: p.title,
+          priority: p.priority || "medium",
+          estimated_cost_usd: p.estimated_cost_usd,
+          notes: p.notes,
+          resolved: false,
+          created_at: new Date().toISOString(),
+        }));
+
+        const newReports: VehicleHistoryReport[] = [];
+        if (ex.history_report && (ex.history_report.provider || ex.history_report.summary)) {
+          newReports.push({
+            id: genId("rpt"),
+            provider: ex.history_report.provider || "other",
+            report_date: ex.history_report.report_date,
+            url: ex.history_report.url,
+            owners_reported: ex.history_report.owners_reported,
+            accidents_reported: ex.history_report.accidents_reported,
+            title_brand: ex.history_report.title_brand,
+            summary: ex.history_report.summary,
+            added_at: new Date().toISOString(),
+          });
+        }
+
+        set((state) => ({
+          serviceRecordsByVehicle: {
+            ...state.serviceRecordsByVehicle,
+            [id]: [...newServices, ...(state.serviceRecordsByVehicle[id] || [])],
+          },
+          pendingItemsByVehicle: {
+            ...state.pendingItemsByVehicle,
+            [id]: [...newPending, ...(state.pendingItemsByVehicle[id] || [])],
+          },
+          historyReportsByVehicle: {
+            ...state.historyReportsByVehicle,
+            [id]: [...newReports, ...(state.historyReportsByVehicle[id] || [])],
+          },
+        }));
+
+        return { ok: true };
       },
 
       updateVehicle: (patch) =>

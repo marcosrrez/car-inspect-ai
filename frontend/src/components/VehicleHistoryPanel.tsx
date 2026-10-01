@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useInspectionStore } from "../store/useInspectionStore";
+import { DocumentScanner } from "./DocumentScanner";
 import {
   HistoryReportProvider,
   PendingPriority,
@@ -120,6 +121,15 @@ export const VehicleHistoryPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* Scan a document to auto-fill everything */}
+      <div className="flex items-center justify-between gap-3 p-4 rounded-3xl bg-orange-50/60 border border-orange-200/60">
+        <div className="text-xs text-zinc-700 leading-snug">
+          <span className="font-bold text-zinc-900">Add records fast.</span> Upload a Carfax,
+          AutoCheck, or shop invoice and AI files it for you.
+        </div>
+        <DocumentScanner variant="subtle" label="Scan" />
+      </div>
+
       {/* Vehicle Intelligence Header */}
       <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">

@@ -183,6 +183,37 @@ export interface ServiceRecord {
   notes?: string;
 }
 
+// --- AI document ingestion (Carfax / AutoCheck / shop invoices) ---
+export interface ExtractedServiceRecord {
+  task_id?: string;
+  title: string;
+  date?: string;
+  mileage?: number;
+  cost_usd?: number;
+  performed_by?: "diy" | "professional";
+  parts_brand?: string;
+  notes?: string;
+}
+
+export interface ExtractedPendingItem {
+  title: string;
+  priority?: PendingPriority;
+  estimated_cost_usd?: number;
+  notes?: string;
+}
+
+export interface DocumentExtraction {
+  document_type: string;        // e.g. "Shop invoice", "Carfax", "AutoCheck"
+  summary: string;
+  vehicle: Partial<VehicleProfile>;
+  service_records: ExtractedServiceRecord[];
+  pending_items: ExtractedPendingItem[];
+  history_report?: Partial<VehicleHistoryReport> | null;
+  ownership_history?: OwnershipRecord[];
+  accident_history?: AccidentRecord[];
+  warnings?: string[];
+}
+
 // Full export/import payload for the local-first garage.
 export interface GarageExport {
   schema: "car-inspect-garage";
